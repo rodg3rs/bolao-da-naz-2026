@@ -1,0 +1,477 @@
+require('dotenv').config();
+const express = require('express');
+const { createClient } = require('@libsql/client');
+const app = express();
+const nodemailer = require('nodemailer');
+
+app.use(express.json());
+app.use(express.static('public'));
+app.use(express.urlencoded({ extended: true }));
+
+const db = createClient({
+  url: process.env.TURSO_DATABASE_URL,
+  authToken: process.env.TURSO_AUTH_TOKEN,
+});
+
+
+// --- CADASTRO ---
+
+async function enviarEmailBoasVindas(dados) {
+    const transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+            user: process.env.EMAIL_USER,
+            pass: process.env.EMAIL_PASS
+        }
+    });
+
+    const corpoHtml = `
+        <div style="background-color: #121212; color: #ffffff; padding: 20px; font-family: sans-serif; border-radius: 10px;">
+            <h1 style="color: #4CAF50;">⚽ Bem-vindo à Arena, ${dados.nome}!</h1>
+            <p>Seu cadastro no <strong>Bolão da NAZ 2026</strong> foi realizado com sucesso.</p>
+            <div style="background: #1a1a1a; padding: 15px; border-left: 4px solid #4CAF50; margin: 20px 0;">
+                <p><strong>Seus dados de acesso:</strong></p>
+                <p>Apelido: <span style="color: #ffc107;">${dados.apelido}</span></p>
+                <p>Senha: <span style="color: #ffc107;">${dados.senha}</span></p>
+                <p>CPF: ${dados.id}</p>
+            </div>
+            <p style="font-size: 12px; color: #888;">Guarde este e-mail para consultas futuras.</p>
+        </div>
+    `;
+
+    return transporter.sendMail({
+        from: `"Bolão da NAZ" <${process.env.EMAIL_USER}>`,
+        to: dados.email,
+        subject: '🚀 Cadastro Confirmado - Bolão da NAZ 2026',
+        html: corpoHtml
+    });
+
+}
+
+app.post('/cadastrar', async (req, res) => {
+    const { id, nome, apelido, senha, time, celular, email } = req.body; 
+
+    try {
+        const usuarioExistente = await db.execute({
+            sql: "SELECT ID FROM dLogin WHERE ID = ?",
+            args: [id]
+        });
+
+        if (usuarioExistente.rows.length > 0) {
+            return res.json({ success: false, message: "CPF já cadastrado." });
+        }
+
+        await db.execute({
+	   sql: "INSERT INTO dLogin (ID, Nome, Apelido, Senha, Time, Celular, [e-mail]) VALUES (?, ?, ?, ?, ?, ?, ?)",
+           args: [id, nome, apelido, senha, time, celular || "", email || ""]
+        });
+
+        const jogos = await db.execute("SELECT Jogo, Sel1, Sel2, Data, Horario FROM dTabela");
+
+	for (const jogo of jogos.rows) {
+            await db.execute({
+                sql: "INSERT INTO dApostas (ID, Apelido, Jogo, Sel1, Sel2, Data, Horario) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                args: [id, apelido, jogo.Jogo, jogo.Sel1, jogo.Sel2, jogo.Data, jogo.Horario]
+            });
+        }
+
+	if (email) {
+            try {
+                await enviarEmailBoasVindas({ id, nome, apelido, senha, email });
+            } catch (mailError) {
+                console.error("Erro ao enviar e-mail, mas cadastro foi feito:", mailError);
+                // Não travamos o cadastro se o e-mail falhar, mas avisamos no log
+            }
+        }
+        res.json({ success: true, message: "Cadastro realizado! Verifique seu e-mail." });
+    } catch (e) {
+        console.error("Erro no cadastro:", e);
+        res.status(500).json({ success: false, message: "Erro ao processar base de dados." });
+    }
+});
+
+// --- LOGIN ---
+app.post('/login', async (req, res) => {
+    const { apelido, senha } = req.body;
+    try {
+        const result = await db.execute({
+            sql: "SELECT * FROM dLogin WHERE Apelido = ? AND Senha = ?",
+            args: [apelido, senha]
+        });
+        
+        if (result.rows.length > 0) {
+            res.json({ success: true, user: result.rows[0] }); 
+        } else {
+            res.json({ success: false, message: "Credenciais incorretas." });
+        }
+    } catch (e) { res.status(500).json({ success: false }); }
+});
+
+// --- PRESENÇA (PING) ---
+app.post('/api/ping', async (req, res) => {
+    const { apelido } = req.body;
+    if (!apelido) return res.status(400).json({ success: false });
+
+    try {
+        // Atualiza a coluna InOut com o horário atual do servidor para marcar presença
+        await db.execute({
+            sql: "UPDATE dLogin SET InOut = datetime('now', 'localtime') WHERE Apelido = ?",
+            args: [apelido]
+        });
+        res.json({ success: true });
+    } catch (e) {
+        console.error("Erro ao registrar ping:", e);
+        res.status(500).json({ success: false });
+    }
+});
+
+// --- PALPITES ---
+app.get('/minhas-apostas/:apelido', async (req, res) => {
+    try {
+        const result = await db.execute({
+            sql: "SELECT * FROM dApostas WHERE Apelido = ? ORDER BY Data, Horario",
+            args: [req.params.apelido]
+        });
+        res.json({ success: true, apostas: result.rows });
+    } catch (e) { 
+        res.status(500).json({ success: false }); 
+    }
+});
+
+// --- PALPITES (Versão atualizada para salvar em lote) ---
+app.post('/salvar-palpite', async (req, res) => {
+    const { apelido, palpites } = req.body; // Agora espera receber 'palpites' como array
+
+    try {
+        const statements = [];
+
+        for (const p of palpites) {
+            // Verifica o tempo de cada jogo individualmente por segurança
+            const info = await db.execute({
+                sql: "SELECT Data, Horario FROM dTabela WHERE Jogo = ?",
+                args: [p.jogo]
+            });
+
+            if (info.rows.length > 0) {
+                const limite = new Date(`${info.rows[0].Data}T${info.rows[0].Horario}:00`);
+                limite.setMinutes(limite.getMinutes() - 10);
+
+                if (new Date() <= limite) {
+                    statements.push({
+                        sql: "UPDATE dApostas SET Ap1 = ?, Ap2 = ? WHERE Apelido = ? AND Jogo = ?",
+                        args: [p.ap1, p.ap2, apelido, p.jogo]
+                    });
+                }
+            }
+        }
+
+        if (statements.length > 0) {
+            // Executa todas as atualizações de uma só vez
+            await db.batch(statements);
+        }
+
+        res.json({ success: true, message: "Todos os palpites foram processados!" });
+    } catch (e) {
+        console.error("Erro ao salvar palpites em lote:", e);
+        res.status(500).json({ success: false });
+    }
+});
+
+// --- CHAT (24 Horas) ---
+app.get('/get-chat', async (req, res) => {
+    try {
+        await db.execute("DELETE FROM dChat WHERE DataHora < datetime('now', '-1 day')");
+        const result = await db.execute("SELECT Apelido, Mensagem FROM dChat ORDER BY ID ASC LIMIT 50");
+        res.json({ success: true, mensagens: result.rows });
+    } catch (e) {
+        res.status(500).json({ success: false });
+    }
+});
+
+app.post('/enviar-msg', async (req, res) => {
+    const { apelido, mensagem } = req.body;
+    if(!apelido || !mensagem) return res.status(400).json({ success: false });
+
+    try {
+        await db.execute({
+            sql: "INSERT INTO dChat (Apelido, Mensagem) VALUES (?, ?)",
+            args: [apelido, mensagem]
+        });
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ success: false });
+    }
+});
+
+// --- ADMIN: JOGOS E RESULTADOS ---
+app.get('/api/admin/jogos', async (req, res) => {
+    try {
+        const sql = `
+            SELECT t.Jogo, t.Data, t.Horario, t.Sel1, t.Sel2, r.Res1, r.Res2
+            FROM dTabela t
+            LEFT JOIN dResult r ON t.Jogo = r.Jogo
+            ORDER BY t.Data, t.Horario
+        `;
+        const result = await db.execute(sql);
+        res.json({ success: true, jogos: result.rows });
+    } catch (e) {
+        console.error("Erro ao buscar jogos admin:", e);
+        res.status(500).json({ success: false });
+    }
+});
+
+app.post('/api/admin/atualizar_resultado', async (req, res) => {
+    const { jogo, res1, res2 } = req.body;
+    const r1 = parseInt(res1); // Gols Real Time A
+    const r2 = parseInt(res2); // Gols Real Time B
+
+    try {
+        // 1. Atualiza ou insere o resultado oficial
+        await db.execute({
+            sql: "INSERT INTO dResult (Jogo, Res1, Res2) VALUES (?, ?, ?) ON CONFLICT(Jogo) DO UPDATE SET Res1=excluded.Res1, Res2=excluded.Res2",
+            args: [jogo, r1, r2]
+        });
+
+        // 2. Calcula os pontos de todas as apostas para este jogo
+        const sqlCalculo = `
+            UPDATE dApostas 
+            SET Res1 = ?, Res2 = ?, 
+                Pontos = CASE 
+                    -- Se não houve palpite, 0 pontos
+                    WHEN Ap1 IS NULL OR Ap2 IS NULL THEN 0
+
+                    -- 1. Placar Exato (25 pts)
+                    WHEN Ap1 = ? AND Ap2 = ? THEN 25
+
+                    -- 2. Vencedor + Gols do Vencedor (18 pts)
+                    -- (Se ganhou e acertou os gols do time A OU se ganhou e acertou os gols do time B)
+                    WHEN (Ap1 > Ap2 AND ? > ? AND Ap1 = ?) OR (Ap2 > Ap1 AND ? > ? AND Ap2 = ?) THEN 18
+
+                    -- 3. Vencedor + Diferença de Gols (15 pts)
+                    -- (Se acertou quem ganhou e a subtração de gols é igual)
+                    WHEN ((Ap1 > Ap2 AND ? > ?) OR (Ap2 > Ap1 AND ? > ?)) AND (Ap1 - Ap2 = ? - ?) THEN 15
+
+                    -- 4. Vencedor + Gols do Perdedor (12 pts)
+                    -- (Se ganhou e acertou os gols de quem perdeu)
+                    WHEN (Ap1 > Ap2 AND ? > ? AND Ap2 = ?) OR (Ap2 > Ap1 AND ? > ? AND Ap1 = ?) THEN 12
+
+                    -- 5. Apenas o Vencedor / Empate (10 pts)
+                    WHEN (Ap1 > Ap2 AND ? > ?) OR (Ap1 < Ap2 AND ? < ?) OR (Ap1 = Ap2 AND ? = ?) THEN 10
+
+                    -- 6. Nenhum acerto
+                    ELSE 0 
+                END
+            WHERE Jogo = ?
+        `;
+
+        await db.execute({
+            sql: sqlCalculo,
+            args: [
+                r1, r2,        // SET Res1, Res2
+                r1, r2,        // Placar Exato
+                r1, r2, r1,    // Vencedor + Gols Venc (Caso A)
+                r2, r1, r2,    // Vencedor + Gols Venc (Caso B)
+                r1, r2, r2, r1, r1, r2, // Vencedor + Dif Gols (Diferença é sempre A-B no SQLite)
+                r1, r2, r2,    // Vencedor + Gols Perd (Caso A ganhou)
+                r2, r1, r1,    // Vencedor + Gols Perd (Caso B ganhou)
+                r1, r2, r1, r2, r1, r2, // Apenas Vencedor/Empate
+                jogo           // WHERE Jogo
+            ]
+        });
+
+        res.json({ success: true, message: "Resultado atualizado e pontos recalculados com a nova lógica!" });
+    } catch (e) {
+        console.error("Erro ao calcular pontos:", e);
+        res.status(500).json({ success: false });
+    }
+});
+
+// --- RANKING GERAL COM STATUS ONLINE ---
+app.get('/api/ranking', async (req, res) => {
+    try {
+        // Busca pontos e verifica se o último ping (InOut) foi nos último minuto
+        const result = await db.execute(`
+            SELECT 
+                l.Apelido, 
+		l.PG,
+                SUM(IFNULL(a.Pontos, 0)) as Total,
+                CASE 
+                    WHEN l.InOut > datetime('now', '-1 minutes', 'localtime') THEN 1 
+                    ELSE 0 
+                END as Online
+            FROM dLogin l
+            LEFT JOIN dApostas a ON l.Apelido = a.Apelido
+            GROUP BY l.Apelido, l.PG
+            ORDER BY Total DESC, l.Apelido ASC
+        `);
+        res.json({ success: true, ranking: result.rows });
+    } catch (e) {
+        console.error("Erro ao buscar ranking:", e);
+        res.status(500).json({ success: false });
+    }
+});
+
+/// Rota corrigida para buscar os palpites da galera
+app.get('/api/palpites-galera', async (req, res) => {
+    try {
+        const query = "SELECT * FROM dApostas ORDER BY Data DESC, Horario DESC";
+        
+        // ALTERADO DE 'client' PARA 'db'
+        const result = await db.execute(query); 
+
+        const palpites = result.rows.map(row => ({
+            Apelido: row.Apelido,
+            Jogo: row.Jogo,
+            Sel1: row.Sel1,
+            Ap1: row.Ap1,
+            Sel2: row.Sel2,
+            Ap2: row.Ap2,
+            Res1: row.Res1,
+            Res2: row.Res2,
+            Pontos: row.Pontos,
+            Data: row.Data,
+            Horario: row.Horario
+        }));
+
+        res.json({ success: true, palpites: palpites });
+
+    } catch (error) {
+        console.error("Erro ao buscar palpites da galera:", error);
+        res.status(500).json({ success: false, message: "Erro interno no servidor" });
+    }
+});
+
+// Rota para obter dados das estatísticas atualizada conforme as tabelas reais
+app.get('/api/estatisticas', async (req, res) => {
+    try {
+const queryCravados = `
+    SELECT 
+        Apelido,
+        SUM(CASE WHEN Pontos = 25 THEN 1 ELSE 0 END) as acertos_25,
+        SUM(CASE WHEN Pontos = 18 THEN 1 ELSE 0 END) as acertos_18,
+        SUM(CASE WHEN Pontos = 15 THEN 1 ELSE 0 END) as acertos_15,
+        SUM(CASE WHEN Pontos = 12 THEN 1 ELSE 0 END) as acertos_12,
+        SUM(CASE WHEN Pontos = 10 THEN 1 ELSE 0 END) as acertos_10,
+        SUM(Pontos) as pontos_totais
+    FROM dApostas
+    WHERE Res1 IS NOT NULL
+    GROUP BY Apelido
+    HAVING pontos_totais > 0
+    ORDER BY pontos_totais DESC, acertos_25 DESC
+`;
+
+        // 2. Consulta para TORCIDA (Pontos acumulados pelo TIME do usuário)
+        // Busca o 'Time' na dLogin e soma os 'Pontos' da dApostas usando o 'Apelido' como chave
+        const queryTorcida = `
+            SELECT l.Time, SUM(a.Pontos) as pontos
+            FROM dApostas a
+            JOIN dLogin l ON a.Apelido = l.Apelido
+            GROUP BY l.Time
+            ORDER BY pontos DESC
+        `;
+
+        const rCravados = await db.execute(queryCravados);
+        const rTorcida = await db.execute(queryTorcida);
+
+        // Retorna os dados formatados para o Chart.js
+        res.json({
+            cravados: rCravados.rows,
+            torcida: rTorcida.rows
+        });
+        
+    } catch (error) {
+        console.error("Erro ao processar estatísticas:", error);
+        res.status(500).json({ error: "Erro interno ao buscar estatísticas" });
+    }
+});
+
+// --- ROTA: ENVIAR RANKING SIMPLIFICADO ---
+app.post('/enviar-ranking', async (req, res) => {
+    const { destinatario } = req.body;
+
+    try {
+        // Busca dados do ranking
+        const result = await db.execute(`
+            SELECT 
+                l.Apelido, 
+                SUM(IFNULL(a.Pontos, 0)) as TotalPontos
+            FROM dLogin l
+            LEFT JOIN dApostas a ON l.Apelido = a.Apelido
+            GROUP BY l.Apelido
+            ORDER BY TotalPontos DESC, l.Apelido ASC
+        `);
+
+        let linhasTabela = '';
+        result.rows.forEach((user, index) => {
+            linhasTabela += `
+                <tr>
+                    <td style="padding: 12px; border-bottom: 1px solid #333; text-align: center; color: #888;">${index + 1}º</td>
+                    <td style="padding: 12px; border-bottom: 1px solid #333; font-weight: bold; color: #fff;">${user.Apelido}</td>
+                    <td style="padding: 12px; border-bottom: 1px solid #333; text-align: center; color: #4CAF50; font-weight: bold;">${user.TotalPontos}</td>
+                </tr>`;
+        });
+
+	const corpoHtml = `
+            <div style="background-color: #000000; color: #ffffff; padding: 30px; font-family: Arial, sans-serif;">
+                <div style="max-width: 500px; margin: auto; background-color: #121212; border: 2px solid #4CAF50; border-radius: 12px; padding: 20px;">
+                    <div style="text-align: center; margin-bottom: 25px;">
+                        <h1 style="color: #4CAF50; margin: 0;">🏆 RANKING GERAL</h1>
+                        <p style="font-size: 14px; color: #888;">Bolão da NAZ 2026</p>
+                    </div>
+                    
+                    <table style="width: 100%; border-collapse: collapse; color: #ffffff;">
+                        <thead>
+                            <tr style="background-color: #1a1a1a;">
+                                <th style="padding: 12px; border-bottom: 2px solid #4CAF50; color: #4CAF50;">Pos</th>
+                                <th style="padding: 12px; border-bottom: 2px solid #4CAF50; text-align: left; color: #4CAF50;">Nome</th>
+                                <th style="padding: 12px; border-bottom: 2px solid #4CAF50; color: #4CAF50;">Pts</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${linhasTabela}
+                        </tbody>
+                    </table>
+                    
+                    <div style="text-align: center; margin-top: 30px; font-size: 11px; color: #555;">
+                        <p>E-mail automático enviado pelo Bolão da NAZ</p>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        const transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
+        });
+
+        await transporter.sendMail({
+            from: `"Bolão 2026" <${process.env.EMAIL_USER}>`,
+            to: destinatario,
+            subject: '📊 Classificação Atualizada - Bolão 2026',
+            html: corpoHtml
+        });
+
+        res.send('<h1>Ranking enviado com sucesso!</h1><a href="/mailv2.html">Voltar</a>');
+
+    } catch (error) {
+        console.error("Erro no envio do ranking:", error);
+        res.status(500).send('Erro ao processar e-mail: ' + error.message);
+    }
+
+});
+
+// No server.js, adicione isto:
+app.post('/api/logout', async (req, res) => {
+    const { apelido } = req.body;
+    try {
+        await db.execute({
+            sql: "UPDATE dLogin SET InOut = '2000-01-01 00:00:00' WHERE Apelido = ?",
+            args: [apelido]
+        });
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ success: false }); }
+});
+
+// --- INICIALIZAÇÃO DO SERVIDOR ---
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));

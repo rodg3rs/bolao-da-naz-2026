@@ -1,0 +1,151 @@
+<style>
+    /* Ajustado para preencher a widget-box da coluna fixa */
+    .chat-container-fixo {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        background: transparent;
+    }
+
+    #chat-mensagens {
+        flex: 1;
+        overflow-y: auto;
+        padding: 5px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .msg-balao {
+        background: var(--panel);
+        padding: 8px;
+        border-radius: 6px;
+        border-left: 3px solid var(--accent);
+    }
+
+    .msg-user {
+        display: block;
+        font-size: 0.65rem;
+        font-weight: bold;
+        color: var(--accent);
+        margin-bottom: 2px;
+    }
+
+    .msg-txt {
+        font-size: 0.8rem;
+        color: white;
+        line-height: 1.2;
+    }
+
+    .chat-footer-fixo {
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px solid var(--border);
+    }
+
+    .chat-form-fixo {
+        display: flex;
+        gap: 5px;
+    }
+
+    .chat-form-fixo input {
+        flex: 1;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        color: white;
+        padding: 6px;
+        border-radius: 4px;
+        font-size: 0.8rem;
+    }
+
+    .chat-form-fixo button {
+        background: var(--success);
+        color: white;
+        border: none;
+        padding: 0 10px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: bold;
+    }
+
+    .aviso-chat {
+        font-size: 0.7rem;
+        color: #64748b;
+        text-align: center;
+    }
+
+    /* Scrollbar fina para a coluna lateral */
+    #chat-mensagens::-webkit-scrollbar { width: 3px; }
+    #chat-mensagens::-webkit-scrollbar-thumb { background: var(--border); }
+</style>
+
+<div class="chat-container-fixo">
+    <div id="chat-mensagens">
+        <div style="text-align:center; font-size:0.7rem; color:#334155;">Carregando...</div>
+    </div>
+
+    <div class="chat-footer-fixo" id="chat-entrada">
+        </div>
+</div>
+
+<script>
+    (function() {
+        const msgDiv = document.getElementById('chat-mensagens');
+        const entradaDiv = document.getElementById('chat-entrada');
+
+        // Atualiza a interface de entrada baseado no login
+        function atualizarInterfaceEntrada() {
+            if (typeof usuarioLogado !== 'undefined' && usuarioLogado) {
+                entradaDiv.innerHTML = `
+                    <form onsubmit="enviarZoacao(event)" class="chat-form-fixo">
+                        <input type="text" id="input-zoar" placeholder="Zoe aqui..." maxlength="100" required>
+                        <button type="submit">></button>
+                    </form>`;
+            } else {
+                entradaDiv.innerHTML = `<div class="aviso-chat">Faça login para participar.</div>`;
+            }
+        }
+
+        async function buscarMensagens() {
+            try {
+                const res = await fetch('/get-chat');
+                const data = await res.json();
+                if (data.success) {
+                    msgDiv.innerHTML = data.mensagens.map(m => `
+                        <div class="msg-balao">
+                            <span class="msg-user">${m.Apelido}</span>
+                            <span class="msg-txt">${m.Mensagem}</span>
+                        </div>
+                    `).join('');
+                    msgDiv.scrollTop = msgDiv.scrollHeight;
+                }
+            } catch (e) {}
+        }
+
+        window.enviarZoacao = async function(e) {
+            e.preventDefault();
+            const input = document.getElementById('input-zoar');
+            const txt = input.value.trim();
+            if(!txt || !usuarioLogado) return;
+
+            await fetch('/enviar-msg', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ apelido: usuarioLogado.Apelido, mensagem: txt })
+            });
+            input.value = '';
+            buscarMensagens();
+        };
+
+        // Escuta mudanças no usuário para liberar o input sem dar F5
+        const checkLogin = setInterval(() => {
+            if (typeof usuarioLogado !== 'undefined' && usuarioLogado && !document.getElementById('input-zoar')) {
+                atualizarInterfaceEntrada();
+            }
+        }, 2000);
+
+        atualizarInterfaceEntrada();
+        buscarMensagens();
+        setInterval(buscarMensagens, 5000);
+    })();
+</script>

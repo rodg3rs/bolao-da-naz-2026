@@ -1,0 +1,14 @@
+# Ignorar senhas e chaves (MUITO IMPORTANTE)
+.env
+
+# Ignorar pastas gigantes de bibliotecas
+node_modules/
+
+# Ignorar arquivos de banco de dados locais e backups
+*.db
+*.sqlite
+*.sql
+
+# Ignorar arquivos do sistema (Windows/Mac)
+.DS_Store
+Thumbs.db
