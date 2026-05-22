@@ -112,7 +112,7 @@
             <section class="card-panel p-5 h-full flex flex-col min-h-[500px]">
 		<div class="flex items-center gap-3 mb-4 border-b border-[var(--border)] pb-3">
  		   <i class="fas fa-comments text-[var(--accent)] text-sm"></i>
- 		   <h2 class="text-sm font-bold tracking-tight uppercase text-[var(--accent)]">Zoação (24h)</h2>
+ 		   <h2 class="text-sm font-bold tracking-tight uppercase text-[var(--accent)]">Chat</h2>
 		</div>
                 <div id="container-chat-fixo" class="flex-grow flex flex-col overflow-hidden">
                     <div class="text-center text-sm text-[var(--text-secondary)] py-10">Carregando chat...</div>
@@ -220,19 +220,19 @@
             } catch (e) { console.error("Erro chat:", e); }
         }
 
-async function sairSistema() {
-    // 1. Avisa o servidor para ficar offline imediatamente
-    if (usuarioLogado && usuarioLogado.Apelido) {
-        try {
-            await fetch('/api/logout', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ apelido: usuarioLogado.Apelido })
-            });
-        } catch (e) {
-            console.error("Erro ao avisar logout:", e);
-        }
-    }
+	async function sairSistema() {
+		// 1. Avisa o servidor para ficar offline imediatamente
+		if (usuarioLogado && usuarioLogado.Apelido) {
+			try {
+				await fetch('/api/logout', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ apelido: usuarioLogado.Apelido })
+				});
+			} catch (e) {
+				console.error("Erro ao avisar logout:", e);
+		}
+	}
 
     // 2. Limpa os dados locais
     usuarioLogado = null;
@@ -243,21 +243,21 @@ async function sairSistema() {
     window.location.href = 'sair.html';
 }
 
-async function inicializarRankingFixo() {
-    try {
-        const res = await fetch('ranking.html');
-        const html = await res.text();
-        const container = document.getElementById('modulo-ranking-container');
-        container.innerHTML = html;
-        
-        // Executa o script interno do ranking.html
-        container.querySelectorAll('script').forEach(s => {
-            const ns = document.createElement('script');
-            ns.text = s.text;
-            document.body.appendChild(ns);
-        });
-    } catch (e) { console.error("Erro ao carregar módulo ranking:", e); }
-}
+	async function inicializarRankingFixo() {
+		try {
+			const res = await fetch('ranking.html');
+			const html = await res.text();
+			const container = document.getElementById('modulo-ranking-container');
+			container.innerHTML = html;
+			
+			// Executa o script interno do ranking.html
+			container.querySelectorAll('script').forEach(s => {
+				const ns = document.createElement('script');
+				ns.text = s.text;
+				document.body.appendChild(ns);
+			});
+		} catch (e) { console.error("Erro ao carregar módulo ranking:", e); }
+	}
 
 	document.addEventListener('DOMContentLoaded', () => {
     	    inicializarRankingFixo(); // Novo carregador modular
