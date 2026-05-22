@@ -233,51 +233,39 @@ app.post('/api/admin/atualizar_resultado', async (req, res) => {
         });
 
         // 2. Calcula os pontos de todas as apostas para este jogo
-        const sqlCalculo = `
-            UPDATE dApostas 
-            SET Res1 = ?, Res2 = ?, 
-                Pontos = CASE 
-                    -- Se não houve palpite, 0 pontos
-                    WHEN Ap1 IS NULL OR Ap2 IS NULL THEN 0
+	const sqlCalculo = `
+				UPDATE dApostas 
+				SET Res1 = ?, 
+					Res2 = ?, 
+					Pontos = CASE 
+						-- Se não houve palpite, 0 pontos
+						WHEN Ap1 IS NULL OR Ap2 IS NULL THEN 0
 
-                    -- 1. Placar Exato (25 pts)
-                    WHEN Ap1 = ? AND Ap2 = ? THEN 25
+						-- 1. Placar Exato (25 pts)
+						WHEN Ap1 = ? AND Ap2 = ? THEN 25
 
-                    -- 2. Vencedor + Gols do Vencedor (18 pts)
-                    -- (Se ganhou e acertou os gols do time A OU se ganhou e acertou os gols do time B)
-                    WHEN (Ap1 > Ap2 AND ? > ? AND Ap1 = ?) OR (Ap2 > Ap1 AND ? > ? AND Ap2 = ?) THEN 18
+						-- 2. Acertou apenas a tendência / resultado (10 pts)
+						WHEN (Ap1 > Ap2 AND ? > ?) OR 
+							 (Ap1 < Ap2 AND ? < ?) OR 
+							 (Ap1 = Ap2 AND ? = ?) THEN 10
 
-                    -- 3. Vencedor + Diferença de Gols (15 pts)
-                    -- (Se acertou quem ganhou e a subtração de gols é igual)
-                    WHEN ((Ap1 > Ap2 AND ? > ?) OR (Ap2 > Ap1 AND ? > ?)) AND (Ap1 - Ap2 = ? - ?) THEN 15
+						-- 3. Nenhum acerto
+						ELSE 0 
+					END
+				WHERE Jogo = ?
+			`;
 
-                    -- 4. Vencedor + Gols do Perdedor (12 pts)
-                    -- (Se ganhou e acertou os gols de quem perdeu)
-                    WHEN (Ap1 > Ap2 AND ? > ? AND Ap2 = ?) OR (Ap2 > Ap1 AND ? > ? AND Ap1 = ?) THEN 12
-
-                    -- 5. Apenas o Vencedor / Empate (10 pts)
-                    WHEN (Ap1 > Ap2 AND ? > ?) OR (Ap1 < Ap2 AND ? < ?) OR (Ap1 = Ap2 AND ? = ?) THEN 10
-
-                    -- 6. Nenhum acerto
-                    ELSE 0 
-                END
-            WHERE Jogo = ?
-        `;
-
-        await db.execute({
-            sql: sqlCalculo,
-            args: [
-                r1, r2,        // SET Res1, Res2
-                r1, r2,        // Placar Exato
-                r1, r2, r1,    // Vencedor + Gols Venc (Caso A)
-                r2, r1, r2,    // Vencedor + Gols Venc (Caso B)
-                r1, r2, r2, r1, r1, r2, // Vencedor + Dif Gols (Diferença é sempre A-B no SQLite)
-                r1, r2, r2,    // Vencedor + Gols Perd (Caso A ganhou)
-                r2, r1, r1,    // Vencedor + Gols Perd (Caso B ganhou)
-                r1, r2, r1, r2, r1, r2, // Apenas Vencedor/Empate
-                jogo           // WHERE Jogo
-            ]
-        });
+			await db.execute({
+				sql: sqlCalculo,
+				args: [
+					r1, r2,         // SET Res1, Res2
+					r1, r2,         // Placar Exato (25 pts)
+					r1, r2,         // Caso: A ganhou (10 pts)
+					r1, r2,         // Caso: B ganhou (10 pts)
+					r1, r2,         // Caso: Empate (10 pts)
+					jogo            // WHERE Jogo
+				]
+			});
 
         res.json({ success: true, message: "Resultado atualizado e pontos recalculados com a nova lógica!" });
     } catch (e) {
@@ -293,7 +281,7 @@ app.get('/api/ranking', async (req, res) => {
         const result = await db.execute(`
             SELECT 
                 l.Apelido, 
-		l.PG,
+				l.PG,
                 SUM(IFNULL(a.Pontos, 0)) as Total,
                 CASE 
                     WHEN l.InOut > datetime('now', '-1 minutes', 'localtime') THEN 1 
@@ -345,15 +333,12 @@ app.get('/api/palpites-galera', async (req, res) => {
 app.get('/api/estatisticas', async (req, res) => {
     try {
 const queryCravados = `
-    SELECT 
-        Apelido,
-        SUM(CASE WHEN Pontos = 25 THEN 1 ELSE 0 END) as acertos_25,
-        SUM(CASE WHEN Pontos = 18 THEN 1 ELSE 0 END) as acertos_18,
-        SUM(CASE WHEN Pontos = 15 THEN 1 ELSE 0 END) as acertos_15,
-        SUM(CASE WHEN Pontos = 12 THEN 1 ELSE 0 END) as acertos_12,
-        SUM(CASE WHEN Pontos = 10 THEN 1 ELSE 0 END) as acertos_10,
-        SUM(Pontos) as pontos_totais
-    FROM dApostas
+	SELECT 
+		Apelido,
+		SUM(CASE WHEN Pontos = 25 THEN 1 ELSE 0 END) as acertos_25,
+		SUM(CASE WHEN Pontos = 10 THEN 1 ELSE 0 END) as acertos_10,
+		SUM(Pontos) as pontos_totais
+	FROM dApostas
     WHERE Res1 IS NOT NULL
     GROUP BY Apelido
     HAVING pontos_totais > 0

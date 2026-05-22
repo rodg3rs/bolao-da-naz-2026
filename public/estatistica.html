@@ -95,16 +95,21 @@ async function fetchData() {
 	    const ctx = canvas.getContext('2d');
 	    if (chartCravadosInstance) chartCravadosInstance.destroy();
 
-            chartCravadosInstance = new Chart(ctx, {
+chartCravadosInstance = new Chart(ctx, {
                 type: 'bar',
                 data: {
                     labels: lista.map(u => u.Apelido),
                     datasets: [
-                        { label: '25 pts', data: lista.map(u => u.acertos_25 || 0), backgroundColor: '#FFD700' }, // Ouro
-                        { label: '18 pts', data: lista.map(u => u.acertos_18 || 0), backgroundColor: '#DAA520' }, // Dourado Escuro
-                        { label: '15 pts', data: lista.map(u => u.acertos_15 || 0), backgroundColor: '#F0E68C' }, // Caqui (Amarelo claro)
-                        { label: '12 pts', data: lista.map(u => u.acertos_12 || 0), backgroundColor: '#B8860B' }, // Ouro Velho
-                        { label: '10 pts', data: lista.map(u => u.acertos_10 || 0), backgroundColor: '#8B4513' }  // Marrom/Sienna
+                        { 
+                            label: 'Placar Exato (25 pts)', 
+                            data: lista.map(u => u.acertos_25 || 0), 
+                            backgroundColor: '#FFD700' // Ouro
+                        },
+                        { 
+                            label: 'Resultado/Tendência (10 pts)', 
+                            data: lista.map(u => u.acertos_10 || 0), 
+                            backgroundColor: '#10b981' // Esmeralda / Verde
+                        }
                     ]
                 },
                 options: {
