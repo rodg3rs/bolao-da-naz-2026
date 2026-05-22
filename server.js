@@ -62,7 +62,7 @@ app.post('/cadastrar', async (req, res) => {
         }
 
         await db.execute({
-	   sql: "INSERT INTO dLogin (ID, Nome, Apelido, Senha, Time, Celular, [e-mail]) VALUES (?, ?, ?, ?, ?, ?, ?)",
+	   sql: "INSERT INTO dLogin (ID, Nome, Apelido, Senha, Time, Celular, email) VALUES (?, ?, ?, ?, ?, ?, ?)",
            args: [id, nome, apelido, senha, time, celular || "", email || ""]
         });
 
