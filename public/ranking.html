@@ -23,7 +23,7 @@
                         <span class="text-sm text-[var(--text-primary)]">
                             <b class="opacity-50">${index + 1}º</b> ${user.Apelido}${pgIcon} ${onlineIcon}
                         </span>
-                        <b class="text-[var(--accent)] text-xs">${user.Total || 0} pts</b>
+                        <b class="text-[var(--accent)] text-xs">${user.TotalPontos || 0} pts</b>
                     </div>`;
                 });
                 document.getElementById('lista-ranking').innerHTML = html;

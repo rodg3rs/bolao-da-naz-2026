@@ -329,44 +329,92 @@ app.get('/api/palpites-galera', async (req, res) => {
     }
 });
 
-// Rota para obter dados das estatísticas atualizada conforme as tabelas reais
-app.get('/api/estatisticas', async (req, res) => {
-    try {
-const queryCravados = `
-	SELECT 
-		Apelido,
-		SUM(CASE WHEN Pontos = 25 THEN 1 ELSE 0 END) as acertos_25,
-		SUM(CASE WHEN Pontos = 10 THEN 1 ELSE 0 END) as acertos_10,
-		SUM(Pontos) as pontos_totais
-	FROM dApostas
-    WHERE Res1 IS NOT NULL
-    GROUP BY Apelido
-    HAVING pontos_totais > 0
-    ORDER BY pontos_totais DESC, acertos_25 DESC
-`;
+// --- API DE ESTATÍSTICAS E GRÁFICOS ---
 
-        // 2. Consulta para TORCIDA (Pontos acumulados pelo TIME do usuário)
-        // Busca o 'Time' na dLogin e soma os 'Pontos' da dApostas usando o 'Apelido' como chave
-        const queryTorcida = `
-            SELECT l.Time, SUM(a.Pontos) as pontos
-            FROM dApostas a
-            JOIN dLogin l ON a.Apelido = l.Apelido
-            GROUP BY l.Time
-            ORDER BY pontos DESC
+// 1. Rota para o Ranking Geral (Por Apelido)
+app.get('/api/estatisticas/geral', async (req, res) => {
+    try {
+        // Seleciona o apelido e a soma de pontos de cada aposta acertada
+        const query = `
+            SELECT l.Apelido, SUM(a.Pontos) as TotalPontos
+            FROM dLogin l
+            JOIN dApostas a ON l.Apelido = a.Apelido
+            GROUP BY l.Apelido
+            ORDER BY TotalPontos DESC
+        `;
+        const result = await db.execute(query);
+        res.json({ success: true, dados: result.rows });
+    } catch (error) {
+        console.error("Erro ao buscar estatísticas gerais:", error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// 2. Rota para o Ranking por Gerência
+app.get('/api/estatisticas/gerencia', async (req, res) => {
+    const tipo = req.query.tipo || 'SOMA'; // SOMA ou MEDIA
+    try {
+        let metricsSQL = "SUM(a.Pontos)";
+        if (tipo === 'MEDIA') {
+            metricsSQL = "ROUND(AVG(user_total.Total), 1)";
+        }
+
+        // Para média harmônica por participante, primeiro somamos por usuário, depois agrupamos por gerência
+        const query = tipo === 'MEDIA' ? `
+            SELECT Gerencia, ROUND(AVG(TotalUser), 1) as TotalPontos
+            FROM (
+                SELECT l.Gerencia, l.Apelido, SUM(a.Pontos) as TotalUser
+                FROM dLogin l
+                JOIN dApostas a ON l.Apelido = a.Apelido
+                GROUP BY l.Apelido
+            )
+            WHERE Gerencia IS NOT NULL AND Gerencia != ''
+            GROUP BY Gerencia
+            ORDER BY TotalPontos DESC
+        ` : `
+            SELECT l.Gerencia, SUM(a.Pontos) as TotalPontos
+            FROM dLogin l
+            JOIN dApostas a ON l.Apelido = a.Apelido
+            WHERE l.Gerencia IS NOT NULL AND l.Gerencia != ''
+            GROUP BY l.Gerencia
+            ORDER BY TotalPontos DESC
         `;
 
-        const rCravados = await db.execute(queryCravados);
-        const rTorcida = await db.execute(queryTorcida);
-
-        // Retorna os dados formatados para o Chart.js
-        res.json({
-            cravados: rCravados.rows,
-            torcida: rTorcida.rows
-        });
-        
+        const result = await db.execute(query);
+        res.json({ success: true, dados: result.rows });
     } catch (error) {
-        console.error("Erro ao processar estatísticas:", error);
-        res.status(500).json({ error: "Erro interno ao buscar estatísticas" });
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// 3. Rota para o Ranking por Times (Equipes)
+app.get('/api/estatisticas/times', async (req, res) => {
+    const tipo = req.query.tipo || 'SOMA'; // SOMA ou MEDIA
+    try {
+        const query = tipo === 'MEDIA' ? `
+            SELECT Time, ROUND(AVG(TotalUser), 1) as TotalPontos
+            FROM (
+                SELECT l.Time, l.Apelido, SUM(a.Pontos) as TotalUser
+                FROM dLogin l
+                JOIN dApostas a ON l.Apelido = a.Apelido
+                GROUP BY l.Apelido
+            )
+            WHERE Time IS NOT NULL AND Time != ''
+            GROUP BY Time
+            ORDER BY TotalPontos DESC
+        ` : `
+            SELECT l.Time, SUM(a.Pontos) as TotalPontos
+            FROM dLogin l
+            JOIN dApostas a ON l.Apelido = a.Apelido
+            WHERE l.Time IS NOT NULL AND l.Time != ''
+            GROUP BY l.Time
+            ORDER BY TotalPontos DESC
+        `;
+
+        const result = await db.execute(query);
+        res.json({ success: true, dados: result.rows });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
     }
 });
 
