@@ -138,12 +138,13 @@ app.get('/minhas-apostas/:apelido', async (req, res) => {
     }
 });
 
-// --- PALPITES (Versão atualizada para salvar em lote) ---
+// --- PALPITES (Versão atualizada para salvar em lote com Correção de Fuso) ---
 app.post('/salvar-palpite', async (req, res) => {
     const { apelido, palpites } = req.body; // Agora espera receber 'palpites' como array
 
     try {
         const statements = [];
+        const agora = new Date(); // Pega o timestamp universal atual
 
         for (const p of palpites) {
             // Verifica o tempo de cada jogo individualmente por segurança
@@ -153,10 +154,18 @@ app.post('/salvar-palpite', async (req, res) => {
             });
 
             if (info.rows.length > 0) {
-                const limite = new Date(`${info.rows[0].Data}T${info.rows[0].Horario}:00`);
+                const dataJogo = info.rows[0].Data; // Ex: 2026-06-15
+                const horaJogo = info.rows[0].Horario; // Ex: 16:00
+                
+                // 1. Garante que a data use hífens e força o fuso horário de Brasília (-03:00)
+                const dataFormatada = dataJogo.replace(/\//g, '-');
+                const limite = new Date(`${dataFormatada}T${horaJogo}:00-03:00`);
+                
+                // Subtrai os 10 minutos de tolerância
                 limite.setMinutes(limite.getMinutes() - 10);
 
-                if (new Date() <= limite) {
+                // 2. Comparação justa de Timestamps (Independe de onde o servidor está hospedado)
+                if (agora <= limite) {
                     statements.push({
                         sql: "UPDATE dApostas SET Ap1 = ?, Ap2 = ? WHERE Apelido = ? AND Jogo = ?",
                         args: [p.ap1, p.ap2, apelido, p.jogo]
@@ -168,12 +177,15 @@ app.post('/salvar-palpite', async (req, res) => {
         if (statements.length > 0) {
             // Executa todas as atualizações de uma só vez
             await db.batch(statements);
+            res.json({ success: true, message: `${statements.length} palpite(s) atualizado(s) com sucesso!` });
+        } else {
+            // Caso o usuário tente enviar palpites mas todos já estejam bloqueados pelo horário
+            res.json({ success: false, message: "Tempo esgotado para todos os jogos enviados!" });
         }
 
-        res.json({ success: true, message: "Todos os palpites foram processados!" });
     } catch (e) {
         console.error("Erro ao salvar palpites em lote:", e);
-        res.status(500).json({ success: false });
+        res.status(500).json({ success: false, message: "Erro interno ao processar lote." });
     }
 });
 
