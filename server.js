@@ -282,7 +282,7 @@ app.get('/api/ranking', async (req, res) => {
             SELECT 
                 l.Apelido, 
 				l.PG,
-                SUM(IFNULL(a.Pontos, 0)) as Total,
+                SUM(IFNULL(a.Pontos, 0)) as TotalPontos,
                 CASE 
                     WHEN l.InOut > datetime('now', '-1 minutes', 'localtime') THEN 1 
                     ELSE 0 
