@@ -290,7 +290,7 @@ app.get('/api/ranking', async (req, res) => {
             FROM dLogin l
             LEFT JOIN dApostas a ON l.Apelido = a.Apelido
             GROUP BY l.Apelido, l.PG
-            ORDER BY Total DESC, l.Apelido ASC
+            ORDER BY TotalPontos DESC, l.Apelido ASC
         `);
         res.json({ success: true, ranking: result.rows });
     } catch (e) {
