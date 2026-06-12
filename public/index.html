@@ -100,16 +100,16 @@
     </nav>
 </div>
 
-<main class="flex-grow w-full max-w-[1600px] mx-auto pt-1 px-4 md:px-6 pb-6 grid grid-cols-1 xl:grid-cols-[250px_1fr_250px] gap-0">
+<main class="flex-grow w-full max-w-[1600px] mx-auto pt-1 px-4 md:px-6 pb-6 grid grid-cols-1 xl:grid-cols-[250px_1fr_250px] gap-0 items-start">
         
 	<aside id="modulo-ranking-container" class="xl:col-span-1 order-2 xl:order-1">
     	    </aside>
-	<div id="conteudo-central" class="xl:col-span-1 order-1 xl:order-2 card-panel p-0 flex flex-col items-center justify-center min-h-[400px] rounded-none border-r-0 overflow-hidden relative bg-center bg-cover bg-no-repeat" 
-     		style="background-image: url('/img/copa2026.png');">
-    	</div>
+		<div id="conteudo-central" class="xl:col-span-1 order-1 xl:order-2 card-panel p-0 flex flex-col justify-start w-full min-h-[650px] rounded-none border-r-0 overflow-hidden relative bg-center bg-cover bg-no-repeat" 
+		 style="background-image: url('/img/copa2026.png');">
+		</div>
 
         <aside class="xl:col-span-1 order-3">
-            <section class="card-panel p-5 h-full flex flex-col min-h-[500px]">
+            <section class="card-panel p-5 h-full flex flex-col min-h-[650px]">
 		<div class="flex items-center gap-3 mb-4 border-b border-[var(--border)] pb-3">
  		   <i class="fas fa-comments text-[var(--accent)] text-sm"></i>
  		   <h2 class="text-sm font-bold tracking-tight uppercase text-[var(--accent)]">Chat</h2>
@@ -152,13 +152,16 @@
                 const html = await response.text();
                 const centro = document.getElementById('conteudo-central');
 
-	// AJUSTE AQUI: Remove a imagem de fundo para os gráficos ficarem legíveis
-        if (arquivo === 'estatistica.html') {
-            centro.style.backgroundImage = 'none';
-            centro.style.backgroundColor = 'var(--card-bg)';
-        } else {
-            centro.style.backgroundImage = "url('/img/copa2026.png')";
-        }
+			// AJUSTE AQUI: Remove o background e garante o alinhamento correto no topo e largura total
+			if (arquivo === 'estatistica.html') {
+				centro.style.backgroundImage = 'none';
+				centro.style.backgroundColor = 'var(--card-bg)';
+				centro.style.display = 'block'; // Muda de flex para block para o container fluir naturalmente do topo
+				centro.style.width = '100%';
+			} else {
+				centro.style.backgroundImage = "url('/img/copa2026.png')";
+				centro.style.display = 'flex'; // Restaura o flex padrão para os outros módulos
+			}
 
                 centro.innerHTML = html;
 
