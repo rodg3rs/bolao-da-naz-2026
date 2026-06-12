@@ -55,13 +55,13 @@
             </div>
         </div>
 
-        <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 shadow-2xl">
-            <h3 id="titulo-grafico" class="text-md font-bold text-slate-300 mb-4 flex items-center gap-2 uppercase tracking-wide">
-                </h3>
-            <div class="relative w-full chart-container overflow-y-auto" style="height: 550px;">
-                <canvas id="chartPrincipal"></canvas>
-            </div>
-        </div>
+		<div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 md:p-5 shadow-2xl w-full">
+			<h3 id="titulo-grafico" class="text-md font-bold text-slate-300 mb-4 flex items-center gap-2 uppercase tracking-wide">
+			</h3>
+			<div class="relative w-full chart-container overflow-y-auto block clean-block" style="height: 550px; max-height: 600px;">
+				<canvas id="chartPrincipal" class="block w-full m-0 p-0"></canvas>
+			</div>
+		</div>
     </main>
 
     <script>
@@ -165,61 +165,73 @@
             }
         }
 
-        function renderizarGraficoHorizontal(labels, valores, corBarra) {
-            const ctx = document.getElementById('chartPrincipal').getContext('2d');
-            
-            if (chartInstance) {
-                chartInstance.destroy();
-            }
+		function renderizarGraficoHorizontal(labels, valores, corBarra) {
+			const ctx = document.getElementById('chartPrincipal').getContext('2d');
+			
+			if (chartInstance) {
+				chartInstance.destroy();
+			}
 
-            // Força a altura do container a expandir se houver muitos dados (evita esmagamento)
-            const alturaDinamica = Math.max(550, labels.length * 35);
-            document.getElementById('chartPrincipal').parentElement.style.height = `${alturaDinamica}px`;
+			// Reduzimos de 35 para 28 para compactar o gráfico verticalmente e mantê-lo no topo
+			const alturaDinamica = Math.max(500, labels.length * 28);
+			const canvasContainer = document.getElementById('chartPrincipal').parentElement;
+			
+			// Atualiza a altura do container interno para gerar o scroll correto
+			canvasContainer.style.height = `${alturaDinamica}px`;
 
-            chartInstance = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        data: valores,
-                        backgroundColor: corBarra,
-                        borderRadius: 6,
-                        borderSkipped: false,
-                        barThickness: 22
-                    }]
-                },
-                options: {
-                    indexAxis: 'y', // Define o gráfico estritamente como HORIZONTAL
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false },
-                        datalabels: {
-                            color: '#fff',
-                            anchor: 'end',
-                            align: 'left',
-                            offset: 8,
-                            font: { weight: 'bold', size: 11 },
-                            formatter: (value) => value
-                        }
-                    },
-                    scales: {
-                        x: {
-                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                            ticks: { color: '#94a3b8' }
-                        },
-                        y: {
-                            grid: { display: false },
-                            ticks: { 
-                                color: '#f8fafc',
-                                font: { weight: '600' }
-                            }
-                        }
-                    }
-                },
-                plugins: [ChartDataLabels]
-            });
-        }
+			chartInstance = new Chart(ctx, {
+				type: 'bar',
+				data: {
+					labels: labels,
+					datasets: [{
+						data: valores,
+						backgroundColor: corBarra,
+						borderRadius: 6,
+						borderSkipped: false,
+						barThickness: 18 // Ajustado levemente para casar com a altura menor por linha
+					}]
+				},
+				options: {
+					indexAxis: 'y',
+					responsive: true,
+					maintainAspectRatio: false, // Fundamental para respeitar a altura que setamos via JS
+					layout: {
+						padding: {
+							top: 5,   // Garante que a primeira barra fique colada no topo do canvas
+							bottom: 5,
+							left: 0,
+							right: 20 // Espaço para a label do último colocado não cortar
+						}
+					},
+					plugins: {
+						legend: { display: false },
+						datalabels: {
+							color: '#fff',
+							anchor: 'end',
+							align: 'left',
+							offset: 8,
+							font: { weight: 'bold', size: 11 },
+							formatter: (value) => value
+						}
+					},
+					scales: {
+						x: {
+							grid: { color: 'rgba(255, 255, 255, 0.05)' },
+							ticks: { color: '#94a3b8' }
+						},
+						y: {
+							grid: { display: false },
+							ticks: { 
+								color: '#f8fafc',
+								font: { weight: '600' },
+								mirror: false // Mantém os nomes fixos na lateral esquerda externa
+							}
+						}
+					}
+				},
+				plugins: [ChartDataLabels]
+			});
+		}
 
         // Inicialização automática ao entrar na página
         window.addEventListener('DOMContentLoaded', () => {
