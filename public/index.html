@@ -191,12 +191,27 @@
             if(el) el.classList.add('active');
         }
 
-        function definirUsuario(dados) {
-            usuarioLogado = dados;
-            document.getElementById('user-display').innerText = usuarioLogado.Apelido;
-            enviarPing();
-            limparCentro();
-        }
+	function definirUsuario(dados) {
+		usuarioLogado = dados;
+		
+		// Captura as variáveis tratando possíveis variações de maiúsculas/minúsculas vindas do banco
+		const apelido = usuarioLogado.Apelido || usuarioLogado.apelido || "Visitante";
+		const gerencia = usuarioLogado.Gerencia || usuarioLogado.gerencia || "";
+		const time = usuarioLogado.Time || usuarioLogado.time || "";
+		
+		// Monta a string dependendo se os dados extras existem
+		let infoExibicao = apelido;
+		if (gerencia || time) {
+			const infoExtra = [gerencia, time].filter(Boolean).join(" - ");
+			infoExibicao += ` (${infoExtra})`;
+		}
+		
+		// Atualiza o elemento no topo da página
+		document.getElementById('user-display').innerText = infoExibicao;
+		
+		enviarPing();
+		limparCentro();
+	}
 
         async function enviarPing() {
             if (!usuarioLogado?.Apelido) return;
