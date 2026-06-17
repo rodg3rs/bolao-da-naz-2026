@@ -44,86 +44,96 @@
 </div>
 
 <script>
-    // 1. Bloqueia navegação externa enquanto estiver na Galera
+// 1. Bloqueia navegação externa enquanto estiver na Galera
     document.querySelectorAll('.menu-item').forEach(btn => {
         if (!btn.innerText.includes('Galera')) btn.style.pointerEvents = 'none';
     });
 
-    async function carregarDadosGalera() {
+    // Variável para controlar se os componentes de select já foram montados
+    let selectsInicializados = false;
+
+    async function carregarDadosGalera(jogoFiltro = "", apelidoFiltro = "") {
         try {
-            // Chamada para sua API que lê a tabela dApostas
-            const response = await fetch('/api/palpites-galera'); 
+            const tbody = document.getElementById('corpoTabelaGalera');
+            const loading = document.getElementById('loading-galera');
+            
+            loading.innerText = 'Carregando palpites...';
+            loading.classList.remove('hidden');
+            tbody.innerHTML = '';
+
+            // Monta os parâmetros dinâmicos na URL para mandar ao servidor
+            let url = '/api/palpites-galera';
+            const params = [];
+            if (jogoFiltro) params.push(`jogo=${encodeURIComponent(jogoFiltro)}`);
+            if (apelidoFiltro) params.push(`apelido=${encodeURIComponent(apelidoFiltro)}`);
+            if (params.length > 0) url += '?' + params.join('&');
+
+            const response = await fetch(url); 
             const data = await response.json();
-            const selectJogo = document.getElementById('filtroJogo');
-	    const jogosUnicos = [...new Set(data.palpites.map(p => p.Jogo))].sort();
 
             if (!data.success) throw new Error(data.message);
 
-selectJogo.innerHTML = '<option value="">Escolha um jogo...</option>'; // Texto inicial alterado
+            // 1. Alimenta os Selects de Filtro (Apenas na primeira carga da tela)
+            if (!selectsInicializados) {
+                const selectJogo = document.getElementById('filtroJogo');
+                selectJogo.innerHTML = '<option value="">Todos os Jogos</option>';
+                data.listaJogos.forEach(j => {
+                    const textoExibicao = `${j.Jogo} - ${j.Sel1} x ${j.Sel2}`;
+                    selectJogo.innerHTML += `<option value="${j.Jogo}">${textoExibicao}</option>`;
+                });
+                if (data.jogoInicial) selectJogo.value = data.jogoInicial;
 
-jogosUnicos.forEach(jogo => {
-    const p = data.palpites.find(item => item.Jogo === jogo);
-    const textoExibicao = `${jogo} - ${p.Sel1} x ${p.Sel2}`;
-    selectJogo.innerHTML += `<option value="${jogo}">${textoExibicao}</option>`;
-});
+                const selectApelido = document.getElementById('filtroApelido');
+                selectApelido.innerHTML = '<option value="">Escolha o Cara...</option>';
+                data.listaApostadores.forEach(user => {
+                    selectApelido.innerHTML += `<option value="${user.Apelido.toUpperCase()}">${user.Apelido}</option>`;
+                });
+                if (apelidoFiltro) selectApelido.value = apelidFiltro.toUpperCase();
 
-// --- INÍCIO DA INSERÇÃO ---
-// Seleciona o elemento do apostador e extrai nomes únicos da lista de palpites
-const selectApelido = document.getElementById('filtroApelido');
-const apelidosUnicos = [...new Set(data.palpites.map(p => p.Apelido))].sort();
-
-selectApelido.innerHTML = '<option value="">Escolha o Cara...</option>';
-apelidosUnicos.forEach(apelido => {
-    // Adiciona cada apelido como uma opção no menu suspenso
-    selectApelido.innerHTML += `<option value="${apelido.toUpperCase()}">${apelido}</option>`;
-});
-
-	    document.getElementById('loading-galera').innerText = 'Selecione um jogo para ver os palpites.';
-
-            const tbody = document.getElementById('corpoTabelaGalera');
-            const loading = document.getElementById('loading-galera');
-            tbody.innerHTML = '';
+                selectsInicializados = true;
+            }
             
             const agora = new Date();
 
-data.palpites.forEach(p => {
-    const dataJogo = new Date(`${p.Data}T${p.Horario}`);
-    
-    if (dataJogo <= agora || p.Res1 !== null) {
-        // Formata o palpite para garantir o X centralizado
-        const palpiteFormatado = `
-            <div class="flex items-center justify-center w-full gap-2">
-                <span class="flex-1 text-right uppercase text-[10px] sm:text-xs text-white truncate">${p.Sel1}</span>
-                <span class="w-6 text-center text-yellow-400 font-bold">${p.Ap1}</span>
-                <span class="text-slate-500 text-[10px]">x</span>
-                <span class="w-6 text-center text-yellow-400 font-bold">${p.Ap2}</span>
-                <span class="flex-1 text-left uppercase text-[10px] sm:text-xs text-white truncate">${p.Sel2}</span>
-            </div>
-        `;
+            data.palpites.forEach(p => {
+                const dataJogo = new Date(`${p.Data}T${p.Horario}`);
+                
+                // Validação de segurança: Só mostra se o jogo já começou ou se tem resultado oficial
+                if (dataJogo <= agora || p.Res1 !== null) {
+                    const palpiteFormatado = `
+                        <div class="flex items-center justify-center w-full gap-2">
+                            <span class="flex-1 text-right uppercase text-[10px] sm:text-xs text-white truncate">${p.Sel1}</span>
+                            <span class="w-6 text-center text-yellow-400 font-bold">${p.Ap1}</span>
+                            <span class="text-slate-500 text-[10px]">x</span>
+                            <span class="w-6 text-center text-yellow-400 font-bold">${p.Ap2}</span>
+                            <span class="flex-1 text-left uppercase text-[10px] sm:text-xs text-white truncate">${p.Sel2}</span>
+                        </div>
+                    `;
 
-        const row = `
-            <tr class="border-b border-slate-800 hover:bg-white/5 transition-colors">
-                <td class="py-3 px-2 font-medium text-yellow-400">${p.Apelido}</td>
-                <td class="py-3 px-2 text-center text-xs text-white opacity-60">${p.Jogo}</td>
-                <td class="py-3 px-2">
-                    ${palpiteFormatado}
-                </td>
-                <td class="py-3 px-2 text-center text-white font-semibold">
-                    ${p.Res1 !== null ? p.Res1 + ' x ' + p.Res2 : '<span class="text-slate-500 italic text-[10px]">Andamento</span>'}
-                </td>
-                <td class="py-3 px-2 text-center">
-                    <span class="bg-yellow-900/20 text-yellow-400 border border-yellow-700/50 px-2 py-1 rounded text-xs font-bold">
-                        ${p.Pontos}
-                    </span>
-                </td>
-            </tr>
-        `;
-        tbody.innerHTML += row;
-    }
-});
+                    const row = `
+                        <tr class="border-b border-slate-800 hover:bg-white/5 transition-colors">
+                            <td class="py-3 px-2 font-medium text-yellow-400">${p.Apelido}</td>
+                            <td class="py-3 px-2 text-center text-xs text-white opacity-60">${p.Jogo}</td>
+                            <td class="py-3 px-2">
+                                ${palpiteFormatado}
+                            </td>
+                            <td class="py-3 px-2 text-center text-white font-semibold">
+                                ${p.Res1 !== null ? p.Res1 + ' x ' + p.Res2 : '<span class="text-slate-500 italic text-[10px]">Andamento</span>'}
+                            </td>
+                            <td class="py-3 px-2 text-center">
+                                <span class="bg-yellow-900/20 text-yellow-400 border border-yellow-700/50 px-2 py-1 rounded text-xs font-bold">
+                                    ${p.Pontos}
+                                </span>
+                            </td>
+                        </tr>
+                    `;
+                    tbody.innerHTML += row;
+                }
+            });
+
             loading.classList.add('hidden');
             if (tbody.innerHTML === '') {
-                loading.innerText = 'Nenhum jogo disponível para consulta ainda.';
+                loading.innerText = 'Nenhum palpite liberado para os critérios selecionados.';
                 loading.classList.remove('hidden');
             }
 
@@ -132,34 +142,14 @@ data.palpites.forEach(p => {
             document.getElementById('loading-galera').innerText = "Erro ao carregar dados.";
         }
     }
-function filtrarGalera() {
-    const termoApelido = document.getElementById("filtroApelido").value.toUpperCase();
-    const termoJogo = document.getElementById("filtroJogo").value;
-    const linhas = document.querySelectorAll("#corpoTabelaGalera tr");
-    const loading = document.getElementById('loading-galera');
 
-    // MUDANÇA: Só esconde tudo se os DOIS filtros estiverem vazios
-    if (termoJogo === "" && termoApelido === "") {
-        linhas.forEach(l => l.style.display = "none");
-        loading.innerText = 'Selecione um jogo ou um apostador para ver os palpites.';
-        loading.classList.remove('hidden');
-        return; 
+    // Dispara a nova busca filtrada direto no banco de dados ao mudar o select
+    function filtrarGalera() {
+        const termoApelido = document.getElementById("filtroApelido").value;
+        const termoJogo = document.getElementById("filtroJogo").value;
+        
+        carregarDadosGalera(termoJogo, termoApelido);
     }
-
-    loading.classList.add('hidden');
-
-    linhas.forEach(linha => {
-        const apelidoTxt = linha.cells[0].textContent.toUpperCase();
-        const jogoTxt = linha.cells[1].textContent; 
-
-        // REVERTIDO: Agora, se o filtro estiver vazio (""), ele ignora aquela restrição
-        const bateApelido = termoApelido === "" || apelidoTxt.includes(termoApelido);
-        const bateJogo = termoJogo === "" || jogoTxt === termoJogo;
-
-        // A linha aparece se atender aos critérios selecionados
-        linha.style.display = (bateApelido && bateJogo) ? "" : "none";
-    });
-}
 
     function fecharModuloGalera() {
         // Libera navegação
@@ -171,6 +161,6 @@ function filtrarGalera() {
         centro.style.backgroundImage = "url('/img/copa2026.png')";
     }
 
-    // Inicializa a carga
+    // Inicializa a carga trazendo o jogo mais recente por padrão
     carregarDadosGalera();
 </script>

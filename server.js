@@ -311,13 +311,60 @@ app.get('/api/ranking', async (req, res) => {
     }
 });
 
-/// Rota corrigida para buscar os palpites da galera
+/// Rota otimizada para buscar os palpites da galera filtrados direto no banco
 app.get('/api/palpites-galera', async (req, res) => {
+    const { jogo, apelido } = req.query;
+
     try {
-        const query = "SELECT * FROM dApostas ORDER BY Data DESC, Horario DESC";
+        let query = "SELECT * FROM dApostas";
+        const args = [];
+        const condicoes = [];
+
+        // 1. Se o usuário escolheu um apostador específico
+        if (apelido) {
+            condicoes.push("UPPER(Apelido) = ?");
+            args.push(apelido.toUpperCase());
+        }
+
+        // 2. Se o usuário escolheu um jogo específico
+        if (jogo) {
+            condicoes.push("Jogo = ?");
+            args.push(jogo);
+        }
+
+        // 3. CARGA INICIAL (Sem filtros): Busca automaticamente apenas o jogo mais recente por padrão
+        if (!jogo && !apelido) {
+            // Encontra o último jogo cuja data/horário já passou ou está acontecendo
+            const ultimoJogoResult = await db.execute(`
+                SELECT Jogo FROM dTabela 
+                WHERE (Data || 'T' || Horario) <= datetime('now', 'localtime')
+                ORDER BY Data DESC, Horario DESC LIMIT 1
+            `);
+            
+            let jogoPadrao = "";
+            if (ultimoJogoResult.rows.length > 0) {
+                jogoPadrao = ultimoJogoResult.rows[0].Jogo;
+            } else {
+                // Se nenhum jogo começou ainda (início do campeonato), pega o primeiríssimo jogo
+                const primeiroJogoResult = await db.execute("SELECT Jogo FROM dTabela ORDER BY Data ASC, Horario ASC LIMIT 1");
+                if (primeiroJogoResult.rows.length > 0) jogoPadrao = primeiroJogoResult.rows[0].Jogo;
+            }
+
+            if (jogoPadrao) {
+                condicoes.push("Jogo = ?");
+                args.push(jogoPadrao);
+            }
+        }
+
+        // Monta a cláusula WHERE dinamicamente se houver filtros
+        if (condicoes.length > 0) {
+            query += " WHERE " + condicoes.join(" AND ");
+        }
+
+        // Mantém a ordenação limpa e rápida
+        query += " ORDER BY Jogo ASC, Apelido ASC";
         
-        // ALTERADO DE 'client' PARA 'db'
-        const result = await db.execute(query); 
+        const result = await db.execute({ sql: query, args: args }); 
 
         const palpites = result.rows.map(row => ({
             Apelido: row.Apelido,
@@ -333,7 +380,19 @@ app.get('/api/palpites-galera', async (req, res) => {
             Horario: row.Horario
         }));
 
-        res.json({ success: true, palpites: palpites });
+        // Puxa a lista completa e leve de jogos existentes para alimentar o select do topo
+        const jogosTabela = await db.execute("SELECT Jogo, Sel1, Sel2 FROM dTabela ORDER BY Data ASC, Horario ASC");
+
+        // Puxa a lista completa e leve de apostadores para o select do topo
+        const apostadoresTabela = await db.execute("SELECT DISTINCT Apelido FROM dLogin ORDER BY Apelido ASC");
+
+        res.json({ 
+            success: true, 
+            palpites: palpites,
+            listaJogos: jogosTabela.rows, 
+            listaApostadores: apostadoresTabela.rows,
+            jogoInicial: jogo ? jogo : (args[0] || "")
+        });
 
     } catch (error) {
         console.error("Erro ao buscar palpites da galera:", error);
