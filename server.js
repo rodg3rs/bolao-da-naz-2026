@@ -312,6 +312,7 @@ app.get('/api/ranking', async (req, res) => {
 });
 
 /// Rota otimizada para buscar os palpites da galera filtrados direto no banco
+// Substitua a sua rota antiga por esta no seu server.js
 app.get('/api/palpites-galera', async (req, res) => {
     const { jogo, apelido } = req.query;
 
@@ -332,20 +333,33 @@ app.get('/api/palpites-galera', async (req, res) => {
             args.push(jogo);
         }
 
-        // 3. CARGA INICIAL (Sem filtros): Busca automaticamente apenas o jogo mais recente por padrão
+        // 3. CARGA INICIAL (Sem filtros): Busca automaticamente o jogo correto usando a Opção 2
         if (!jogo && !apelido) {
-            // Encontra o último jogo cuja data/horário já passou ou está acontecendo
-            const ultimoJogoResult = await db.execute(`
-                SELECT Jogo FROM dTabela 
-                WHERE (Data || 'T' || Horario) <= datetime('now', 'localtime')
-                ORDER BY Data DESC, Horario DESC LIMIT 1
-            `);
+            // Captura a data atual exata no fuso horário de Brasília (Formato: AAAA-MM-DD)
+            const dataAtualStr = new Intl.DateTimeFormat('pt-BR', {
+                timeZone: 'America/Sao_Paulo',
+                year: 'numeric', month: '2-digit', day: '2-digit'
+            }).format(new Date()).split('/').reverse().join('-');
+
+            // Captura a hora atual exata no fuso horário de Brasília (Formato: HH:MM)
+            const horaAtualStr = new Intl.DateTimeFormat('pt-BR', {
+                timeZone: 'America/Sao_Paulo',
+                hour: '2-digit', minute: '2-digit', hour12: false
+            }).format(new Date());
+
+            // Busca o jogo mais recente cuja Data e Horário sejam menores ou iguais ao exato momento de agora
+            const ultimoJogoResult = await db.execute({
+                sql: `SELECT Jogo FROM dTabela 
+                      WHERE Data < ? OR (Data = ? AND Horario <= ?) 
+                      ORDER BY Data DESC, Horario DESC LIMIT 1`,
+                args: [dataAtualStr, dataAtualStr, horaAtualStr]
+            });
             
             let jogoPadrao = "";
             if (ultimoJogoResult.rows.length > 0) {
                 jogoPadrao = ultimoJogoResult.rows[0].Jogo;
             } else {
-                // Se nenhum jogo começou ainda (início do campeonato), pega o primeiríssimo jogo
+                // Se nenhum jogo começou ainda, traz o primeiríssimo jogo do campeonato
                 const primeiroJogoResult = await db.execute("SELECT Jogo FROM dTabela ORDER BY Data ASC, Horario ASC LIMIT 1");
                 if (primeiroJogoResult.rows.length > 0) jogoPadrao = primeiroJogoResult.rows[0].Jogo;
             }
@@ -361,7 +375,7 @@ app.get('/api/palpites-galera', async (req, res) => {
             query += " WHERE " + condicoes.join(" AND ");
         }
 
-        // Mantém a ordenação limpa e rápida
+        // Mantém a ordenação rápida
         query += " ORDER BY Jogo ASC, Apelido ASC";
         
         const result = await db.execute({ sql: query, args: args }); 
@@ -380,10 +394,8 @@ app.get('/api/palpites-galera', async (req, res) => {
             Horario: row.Horario
         }));
 
-        // Puxa a lista completa e leve de jogos existentes para alimentar o select do topo
+        // Puxa as listas auxiliares para alimentar os selects da tela
         const jogosTabela = await db.execute("SELECT Jogo, Sel1, Sel2 FROM dTabela ORDER BY Data ASC, Horario ASC");
-
-        // Puxa a lista completa e leve de apostadores para o select do topo
         const apostadoresTabela = await db.execute("SELECT DISTINCT Apelido FROM dLogin ORDER BY Apelido ASC");
 
         res.json({ 
@@ -399,7 +411,6 @@ app.get('/api/palpites-galera', async (req, res) => {
         res.status(500).json({ success: false, message: "Erro interno no servidor" });
     }
 });
-
 // --- API DE ESTATÍSTICAS E GRÁFICOS ---
 
 // 1. Rota para o Ranking Geral (Por Apelido)
