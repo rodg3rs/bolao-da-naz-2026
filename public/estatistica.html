@@ -55,26 +55,27 @@
             </div>
         </div>
 
-		<div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 md:p-5 shadow-2xl w-full top-0 sticky">
-			<h3 id="titulo-grafico" class="text-md font-bold text-slate-300 mb-4 flex items-center gap-2 uppercase tracking-wide">
-			</h3>
-			<div class="relative w-full chart-container overflow-y-auto block clean-block" style="height: 550px; max-height: 600px;">
-				<canvas id="chartPrincipal" class="block w-full m-0 p-0"></canvas>
-			</div>
-		</div>
+        <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 md:p-5 shadow-2xl w-full top-0 sticky">
+            <h3 id="titulo-grafico" class="text-md font-bold text-slate-300 mb-4 flex items-center gap-2 uppercase tracking-wide">
+            </h3>
+            <div class="relative w-full chart-container overflow-y-auto block clean-block" style="height: 550px; max-height: 600px;">
+                <canvas id="chartPrincipal" class="block w-full m-0 p-0"></canvas>
+            </div>
+        </div>
     </main>
 
     <script>
+        // CORREÇÃO ESSENCIAL: Registrar globalmente o plugin de DataLabels para o Chart.js v3+
+        Chart.register(ChartDataLabels);
+
         let abaAtual = 'geral';
         let metricaAtual = 'SOMA';
         let limiteAtual = 15;
         let chartInstance = null;
 
-        // Gerencia a troca de abas primárias
         function mudarAba(aba) {
             abaAtual = aba;
             
-            // Atualiza classes visuais dos botões das abas
             ['geral', 'gerencia', 'times'].forEach(a => {
                 const btn = document.getElementById(`btn-${a}`);
                 if (a === aba) {
@@ -86,7 +87,6 @@
                 }
             });
 
-            // Mostra/Esconde sub-filtros dependendo da aba
             if (aba === 'geral') {
                 document.getElementById('wrapper-metrica').classList.add('hidden');
                 document.getElementById('wrapper-limite').classList.remove('hidden');
@@ -126,8 +126,6 @@
                 if (!resJson.success || !resJson.dados) return;
 
                 let dadosProcessados = resJson.dados;
-
-                // Define título e paleta de cores baseado na aba
                 let titulo = "";
                 let labelEixo = "";
                 let corBarra = "";
@@ -135,9 +133,8 @@
                 if (abaAtual === 'geral') {
                     titulo = `<i class="fas fa-users text-blue-500"></i> Ranking Geral por Apelido`;
                     labelEixo = "Apelido";
-                    corBarra = 'rgba(59, 130, 246, 0.85)'; // Azul Royal
+                    corBarra = 'rgba(59, 130, 246, 0.85)';
                     
-                    // Aplica fatiamento do limite se for gráfico geral
                     if (limiteAtual > 0) {
                         dadosProcessados = dadosProcessados.slice(0, limiteAtual);
                         titulo += ` (Top ${limiteAtual})`;
@@ -145,143 +142,135 @@
                 } else if (abaAtual === 'gerencia') {
                     titulo = `<i class="fas fa-sitemap text-emerald-500"></i> Desempenho por Gerência (${metricaAtual.toLowerCase()})`;
                     labelEixo = "Gerencia";
-                    corBarra = 'rgba(16, 185, 129, 0.85)'; // Verde Esmeralda
+                    corBarra = 'rgba(16, 185, 129, 0.85)';
                 } else {
                     titulo = `<i class="fas fa-people-group text-cyan-500"></i> Desempenho por Equipes de Trabalho (${metricaAtual.toLowerCase()})`;
                     labelEixo = "Time";
-                    corBarra = 'rgba(6, 182, 212, 0.85)'; // Ciano
+                    corBarra = 'rgba(6, 182, 212, 0.85)';
                 }
 
                 document.getElementById('titulo-grafico').innerHTML = titulo;
 
-				// Extrai labels dinamicamente baseado na coluna retornada
-				const labels = dadosProcessados.map(item => item[labelEixo] || "Não Informado");
+                const labels = dadosProcessados.map(item => item[labelEixo] || "Não Informado");
 
-				// NOVA LÓGICA DE VERIFICAÇÃO PARA O GRÁFICO GERAL EMPILHADO
-				if (abaAtual === 'geral') {
-					const qtd10 = dadosProcessados.map(item => item.Qtd10 || 0);
-					const qtd25 = dadosProcessados.map(item => item.Qtd25 || 0);
-					// Passa um objeto estruturado contendo as contagens específicas para o modo Geral
-					renderizarGraficoHorizontal(labels, { geral: true, qtd10, qtd25 }, corBarra);
-				} else {
-					// Mantém o fluxo normal para gerências e times (apenas o total de pontos simples)
-					const valores = dadosProcessados.map(item => item.TotalPontos);
-					renderizarGraficoHorizontal(labels, { geral: false, valores }, corBarra);
-				}
-			}
+                if (abaAtual === 'geral') {
+                    const qtd10 = dadosProcessados.map(item => item.Qtd10 || 0);
+                    const qtd25 = dadosProcessados.map(item => item.Qtd25 || 0);
+                    renderizarGraficoHorizontal(labels, { geral: true, qtd10, qtd25 }, corBarra);
+                } else {
+                    const valores = dadosProcessados.map(item => item.TotalPontos);
+                    renderizarGraficoHorizontal(labels, { geral: false, valores }, corBarra);
+                }
+            } catch (error) {
+                console.error("Erro na requisição das estatísticas:", error);
+            }
         }
 
-		function renderizarGraficoHorizontal(labels, dadosEstruturados, corBarraPadrao) {
-		const ctx = document.getElementById('chartPrincipal').getContext('2d');
-		
-		if (chartInstance) {
-			chartInstance.destroy();
-		}
+        function renderizarGraficoHorizontal(labels, dadosEstruturados, corBarraPadrao) {
+            const ctx = document.getElementById('chartPrincipal').getContext('2d');
+            
+            if (chartInstance) {
+                chartInstance.destroy();
+            }
 
-		const alturaDinamica = Math.max(500, labels.length * 28);
-		const canvasContainer = document.getElementById('chartPrincipal').parentElement;
-		canvasContainer.style.height = `${alturaDinamica}px`;
+            const alturaDinamica = Math.max(500, labels.length * 28);
+            const canvasContainer = document.getElementById('chartPrincipal').parentElement;
+            canvasContainer.style.height = `${alturaDinamica}px`;
 
-		// Configuração dinâmica dos Datasets (Empilhamento vs Barra única)
-		let datasetsConfig = [];
+            let datasetsConfig = [];
 
-		if (dadosEstruturados.geral) {
-			datasetsConfig = [
-				{
-					label: 'Acertos de 10 pts',
-					data: dadosEstruturados.qtd10,
-					backgroundColor: 'rgba(14, 165, 233, 0.65)', // Azul Claro (Vem primeiro na esquerda)
-					borderRadius: { topLeft: 0, bottomLeft: 0, topRight: 0, bottomRight: 0 },
-					barThickness: 18,
-					metaTipo: '10p'
-				},
-				{
-					label: 'Acertos de 25 pts',
-					data: dadosEstruturados.qtd25,
-					backgroundColor: 'rgba(29, 78, 216, 0.95)', // Azul Escuro / Fechado (Empilha na ponta direita)
-					borderRadius: { topRight: 6, bottomRight: 6, topLeft: 0, bottomLeft: 0 },
-					borderSkipped: false,
-					barThickness: 18,
-					metaTipo: '25p'
-				}
-			];
-		} else {
-			// Modo padrão para Gerência e Equipes
-			datasetsConfig = [{
-				label: 'Pontos Totais',
-				data: dadosEstruturados.valores,
-				backgroundColor: corBarraPadrao,
-				borderRadius: 6,
-				borderSkipped: false,
-				barThickness: 18
-			}];
-		}
+            if (dadosEstruturados.geral) {
+                datasetsConfig = [
+                    {
+                        label: 'Acertos de 10 pts',
+                        data: dadosEstruturados.qtd10,
+                        backgroundColor: 'rgba(14, 165, 233, 0.65)',
+                        borderRadius: { topLeft: 0, bottomLeft: 0, topRight: 0, bottomRight: 0 },
+                        barThickness: 18,
+                        metaTipo: '10p'
+                    },
+                    {
+                        label: 'Acertos de 25 pts',
+                        data: dadosEstruturados.qtd25,
+                        backgroundColor: 'rgba(29, 78, 216, 0.95)',
+                        borderRadius: { topRight: 6, bottomRight: 6, topLeft: 0, bottomLeft: 0 },
+                        borderSkipped: false,
+                        barThickness: 18,
+                        metaTipo: '25p'
+                    }
+                ];
+            } else {
+                datasetsConfig = [{
+                    label: 'Pontos Totais',
+                    data: dadosEstruturados.valores,
+                    backgroundColor: corBarraPadrao,
+                    borderRadius: 6,
+                    borderSkipped: false,
+                    barThickness: 18
+                }];
+            }
 
-		chartInstance = new Chart(ctx, {
-			type: 'bar',
-			data: {
-				labels: labels,
-				datasets: datasetsConfig
-			},
-			options: {
-				indexAxis: 'y',
-				responsive: true,
-				maintainAspectRatio: false,
-				layout: {
-					padding: { top: 5, bottom: 5, left: 0, right: 25 }
-				},
-				plugins: {
-					legend: { 
-						display: dadosEstruturados.geral, // Só mostra legenda explicativa na Aba Geral
-						position: 'top',
-						labels: { color: '#94a3b8', font: { size: 12, weight: '500' } }
-					},
-					datalabels: {
-						color: '#fff',
-						font: { weight: 'bold', size: 10 },
-						// Alinha e formata o balão de texto dependendo do tipo de dado
-						anchor: dadosEstruturados.geral ? 'center' : 'end',
-						align: dadosEstruturados.geral ? 'center' : 'left',
-						offset: dadosEstruturados.geral ? 0 : 8,
-						formatter: (value, context) => {
-							if (value === 0) return ''; // Oculta números zero para não poluir
-							
-							// Se for o gráfico geral, exibe um sufixo identificando a pontuação daquela seção da barra
-							if (dadosEstruturados.geral) {
-								const tipo = context.dataset.metaTipo;
-								return `${value}x (${tipo})`;
-							}
-							return value;
-						}
-					}
-				},
-				scales: {
-					x: {
-						stacked: dadosEstruturados.geral, // Ativa o empilhamento horizontal no eixo X
-						grid: { color: 'rgba(255, 255, 255, 0.05)' },
-						ticks: { 
-							color: '#94a3b8',
-							callback: function(value) {
-								// Altera o rótulo do eixo inferior para indicar quantidades na aba Geral
-								return dadosEstruturados.geral ? value + ' jogos' : value + ' pts';
-							}
-						}
-					},
-					y: {
-						stacked: dadosEstruturados.geral, // Ativa o empilhamento horizontal no eixo Y
-						grid: { display: false },
-						ticks: { 
-							color: '#f8fafc',
-							font: { weight: '600' }
-						}
-					}
-				}
-			},
-			plugins: [ChartDataLabels]
-		});
-	}
+            chartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: datasetsConfig
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    layout: {
+                        padding: { top: 5, bottom: 5, left: 0, right: 25 }
+                    },
+                    plugins: {
+                        legend: { 
+                            display: dadosEstruturados.geral,
+                            position: 'top',
+                            labels: { color: '#94a3b8', font: { size: 12, weight: '500' } }
+                        },
+                        datalabels: {
+                            color: '#fff',
+                            font: { weight: 'bold', size: 10 },
+                            anchor: dadosEstruturados.geral ? 'center' : 'end',
+                            align: dadosEstruturados.geral ? 'center' : 'left',
+                            offset: dadosEstruturados.geral ? 0 : 8,
+                            formatter: (value, context) => {
+                                if (value === 0) return '';
+                                
+                                if (dadosEstruturados.geral) {
+                                    const tipo = context.dataset.metaTipo;
+                                    return `${value}x (${tipo})`;
+                                }
+                                return value;
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            stacked: dadosEstruturados.geral,
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { 
+                                color: '#94a3b8',
+                                callback: function(value) {
+                                    return dadosEstruturados.geral ? value + ' jogos' : value + ' pts';
+                                }
+                            }
+                        },
+                        y: {
+                            stacked: dadosEstruturados.geral,
+                            grid: { display: false },
+                            ticks: { 
+                                color: '#f8fafc',
+                                font: { weight: '600' }
+                            }
+                        }
+                    }
+                },
+                plugins: [ChartDataLabels]
+            });
+        }
 
-        // Inicialização automática ao entrar na página
         window.addEventListener('DOMContentLoaded', () => {
             mudarAba('geral');
         });
