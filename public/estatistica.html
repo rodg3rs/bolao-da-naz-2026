@@ -246,26 +246,28 @@
                             }
                         }
                     },
-                    scales: {
-                        x: {
-                            stacked: dadosEstruturados.geral,
-                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                            ticks: { 
-                                color: '#94a3b8',
-                                callback: function(value) {
-                                    return dadosEstruturados.geral ? value + ' jogos' : value + ' pts';
-                                }
-                            }
-                        },
-                        y: {
-                            stacked: dadosEstruturados.geral,
-                            grid: { display: false },
-                            ticks: { 
-                                color: '#f8fafc',
-                                font: { weight: '600' }
-                            }
-                        }
-                    }
+// Dentro de renderizarGraficoHorizontal no seu estatistica.html:
+					scales: {
+						x: {
+							stacked: dadosEstruturados.geral,
+							grid: { color: 'rgba(255, 255, 255, 0.05)' },
+							ticks: { 
+								color: '#94a3b8',
+								callback: function(value) {
+									// Garante que o eixo exiba números inteiros corretamente
+									return dadosEstruturados.geral ? value + ' jogos' : value + ' pts';
+								}
+							}
+						},
+						y: {
+							stacked: dadosEstruturados.geral,
+							grid: { display: false },
+							ticks: { 
+								color: '#f8fafc',
+								font: { weight: '600' }
+							}
+						}
+					}
                 },
                 plugins: [ChartDataLabels]
             });

@@ -413,15 +413,15 @@ app.get('/api/palpites-galera', async (req, res) => {
 // 1. Rota Otimizada para o Ranking Geral com Contagem de Acertos Empilhados
 app.get('/api/estatisticas/geral', async (req, res) => {
     try {
-        // Seleciona o apelido, soma total e conta individualmente as ocorrências de 10 e 25 pontos
+        // Alterado para LEFT JOIN para listar os apostadores mesmo se ainda não houver pontos calculados
         const query = `
             SELECT 
                 l.Apelido, 
-                SUM(IFNULL(a.Pontos, 0)) as TotalPontos,
+                TOTAL(IFNULL(a.Pontos, 0)) as TotalPontos,
                 SUM(CASE WHEN a.Pontos = 10 THEN 1 ELSE 0 END) as Qtd10,
                 SUM(CASE WHEN a.Pontos = 25 THEN 1 ELSE 0 END) as Qtd25
             FROM dLogin l
-            JOIN dApostas a ON l.Apelido = a.Apelido
+            LEFT JOIN dApostas a ON l.Apelido = a.Apelido
             GROUP BY l.Apelido
             ORDER BY TotalPontos DESC, l.Apelido ASC
         `;
