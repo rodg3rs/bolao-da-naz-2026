@@ -154,84 +154,132 @@
 
                 document.getElementById('titulo-grafico').innerHTML = titulo;
 
-                // Extrai labels dinamicamente baseado na coluna retornada (Apelido, Gerencia ou Time)
-                const labels = dadosProcessados.map(item => item[labelEixo] || "Não Informado");
-                const valores = dadosProcessados.map(item => item.TotalPontos);
+				// Extrai labels dinamicamente baseado na coluna retornada
+				const labels = dadosProcessados.map(item => item[labelEixo] || "Não Informado");
 
-                renderizarGraficoHorizontal(labels, valores, corBarra);
-
-            } catch (error) {
-                console.error("Erro ao carregar dados do gráfico:", error);
-            }
+				// NOVA LÓGICA DE VERIFICAÇÃO PARA O GRÁFICO GERAL EMPILHADO
+				if (abaAtual === 'geral') {
+					const qtd10 = dadosProcessados.map(item => item.Qtd10 || 0);
+					const qtd25 = dadosProcessados.map(item => item.Qtd25 || 0);
+					// Passa um objeto estruturado contendo as contagens específicas para o modo Geral
+					renderizarGraficoHorizontal(labels, { geral: true, qtd10, qtd25 }, corBarra);
+				} else {
+					// Mantém o fluxo normal para gerências e times (apenas o total de pontos simples)
+					const valores = dadosProcessados.map(item => item.TotalPontos);
+					renderizarGraficoHorizontal(labels, { geral: false, valores }, corBarra);
+				}
+			}
         }
 
-		function renderizarGraficoHorizontal(labels, valores, corBarra) {
-			const ctx = document.getElementById('chartPrincipal').getContext('2d');
-			
-			if (chartInstance) {
-				chartInstance.destroy();
-			}
+		function renderizarGraficoHorizontal(labels, dadosEstruturados, corBarraPadrao) {
+		const ctx = document.getElementById('chartPrincipal').getContext('2d');
+		
+		if (chartInstance) {
+			chartInstance.destroy();
+		}
 
-			// Reduzimos de 35 para 28 para compactar o gráfico verticalmente e mantê-lo no topo
-			const alturaDinamica = Math.max(500, labels.length * 28);
-			const canvasContainer = document.getElementById('chartPrincipal').parentElement;
-			
-			// Atualiza a altura do container interno para gerar o scroll correto
-			canvasContainer.style.height = `${alturaDinamica}px`;
+		const alturaDinamica = Math.max(500, labels.length * 28);
+		const canvasContainer = document.getElementById('chartPrincipal').parentElement;
+		canvasContainer.style.height = `${alturaDinamica}px`;
 
-			chartInstance = new Chart(ctx, {
-				type: 'bar',
-				data: {
-					labels: labels,
-					datasets: [{
-						data: valores,
-						backgroundColor: corBarra,
-						borderRadius: 6,
-						borderSkipped: false,
-						barThickness: 18 // Ajustado levemente para casar com a altura menor por linha
-					}]
+		// Configuração dinâmica dos Datasets (Empilhamento vs Barra única)
+		let datasetsConfig = [];
+
+		if (dadosEstruturados.geral) {
+			datasetsConfig = [
+				{
+					label: 'Acertos de 10 pts',
+					data: dadosEstruturados.qtd10,
+					backgroundColor: 'rgba(14, 165, 233, 0.65)', // Azul Claro (Vem primeiro na esquerda)
+					borderRadius: { topLeft: 0, bottomLeft: 0, topRight: 0, bottomRight: 0 },
+					barThickness: 18,
+					metaTipo: '10p'
 				},
-				options: {
-					indexAxis: 'y',
-					responsive: true,
-					maintainAspectRatio: false, // Fundamental para respeitar a altura que setamos via JS
-					layout: {
-						padding: {
-							top: 5,   // Garante que a primeira barra fique colada no topo do canvas
-							bottom: 5,
-							left: 0,
-							right: 20 // Espaço para a label do último colocado não cortar
-						}
+				{
+					label: 'Acertos de 25 pts',
+					data: dadosEstruturados.qtd25,
+					backgroundColor: 'rgba(29, 78, 216, 0.95)', // Azul Escuro / Fechado (Empilha na ponta direita)
+					borderRadius: { topRight: 6, bottomRight: 6, topLeft: 0, bottomLeft: 0 },
+					borderSkipped: false,
+					barThickness: 18,
+					metaTipo: '25p'
+				}
+			];
+		} else {
+			// Modo padrão para Gerência e Equipes
+			datasetsConfig = [{
+				label: 'Pontos Totais',
+				data: dadosEstruturados.valores,
+				backgroundColor: corBarraPadrao,
+				borderRadius: 6,
+				borderSkipped: false,
+				barThickness: 18
+			}];
+		}
+
+		chartInstance = new Chart(ctx, {
+			type: 'bar',
+			data: {
+				labels: labels,
+				datasets: datasetsConfig
+			},
+			options: {
+				indexAxis: 'y',
+				responsive: true,
+				maintainAspectRatio: false,
+				layout: {
+					padding: { top: 5, bottom: 5, left: 0, right: 25 }
+				},
+				plugins: {
+					legend: { 
+						display: dadosEstruturados.geral, // Só mostra legenda explicativa na Aba Geral
+						position: 'top',
+						labels: { color: '#94a3b8', font: { size: 12, weight: '500' } }
 					},
-					plugins: {
-						legend: { display: false },
-						datalabels: {
-							color: '#fff',
-							anchor: 'end',
-							align: 'left',
-							offset: 8,
-							font: { weight: 'bold', size: 11 },
-							formatter: (value) => value
-						}
-					},
-					scales: {
-						x: {
-							grid: { color: 'rgba(255, 255, 255, 0.05)' },
-							ticks: { color: '#94a3b8' }
-						},
-						y: {
-							grid: { display: false },
-							ticks: { 
-								color: '#f8fafc',
-								font: { weight: '600' },
-								mirror: false // Mantém os nomes fixos na lateral esquerda externa
+					datalabels: {
+						color: '#fff',
+						font: { weight: 'bold', size: 10 },
+						// Alinha e formata o balão de texto dependendo do tipo de dado
+						anchor: dadosEstruturados.geral ? 'center' : 'end',
+						align: dadosEstruturados.geral ? 'center' : 'left',
+						offset: dadosEstruturados.geral ? 0 : 8,
+						formatter: (value, context) => {
+							if (value === 0) return ''; // Oculta números zero para não poluir
+							
+							// Se for o gráfico geral, exibe um sufixo identificando a pontuação daquela seção da barra
+							if (dadosEstruturados.geral) {
+								const tipo = context.dataset.metaTipo;
+								return `${value}x (${tipo})`;
 							}
+							return value;
 						}
 					}
 				},
-				plugins: [ChartDataLabels]
-			});
-		}
+				scales: {
+					x: {
+						stacked: dadosEstruturados.geral, // Ativa o empilhamento horizontal no eixo X
+						grid: { color: 'rgba(255, 255, 255, 0.05)' },
+						ticks: { 
+							color: '#94a3b8',
+							callback: function(value) {
+								// Altera o rótulo do eixo inferior para indicar quantidades na aba Geral
+								return dadosEstruturados.geral ? value + ' jogos' : value + ' pts';
+							}
+						}
+					},
+					y: {
+						stacked: dadosEstruturados.geral, // Ativa o empilhamento horizontal no eixo Y
+						grid: { display: false },
+						ticks: { 
+							color: '#f8fafc',
+							font: { weight: '600' }
+						}
+					}
+				}
+			},
+			plugins: [ChartDataLabels]
+		});
+	}
 
         // Inicialização automática ao entrar na página
         window.addEventListener('DOMContentLoaded', () => {
