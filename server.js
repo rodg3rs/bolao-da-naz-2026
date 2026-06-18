@@ -410,20 +410,16 @@ app.get('/api/palpites-galera', async (req, res) => {
 
 // --- API DE ESTATÍSTICAS E GRÁFICOS ---
 
-// 1. Rota Otimizada para o Ranking Geral com Contagem de Acertos Empilhados
+// 1. Rota para o Ranking Geral (Por Apelido)
 app.get('/api/estatisticas/geral', async (req, res) => {
     try {
-        // Alterado para LEFT JOIN para listar os apostadores mesmo se ainda não houver pontos calculados
+        // Seleciona o apelido e a soma de pontos de cada aposta acertada
         const query = `
-            SELECT 
-                l.Apelido, 
-                TOTAL(IFNULL(a.Pontos, 0)) as TotalPontos,
-                SUM(CASE WHEN a.Pontos = 10 THEN 1 ELSE 0 END) as Qtd10,
-                SUM(CASE WHEN a.Pontos = 25 THEN 1 ELSE 0 END) as Qtd25
+            SELECT l.Apelido, SUM(a.Pontos) as TotalPontos
             FROM dLogin l
-            LEFT JOIN dApostas a ON l.Apelido = a.Apelido
+            JOIN dApostas a ON l.Apelido = a.Apelido
             GROUP BY l.Apelido
-            ORDER BY TotalPontos DESC, l.Apelido ASC
+            ORDER BY TotalPontos DESC
         `;
         const result = await db.execute(query);
         res.json({ success: true, dados: result.rows });
