@@ -372,7 +372,7 @@ app.get('/api/palpites-galera', async (req, res) => {
             query += " WHERE " + condicoes.join(" AND ");
         }
 
-        query += " ORDER BY Jogo ASC, Apelido ASC";
+        query += " ORDER BY Apelido ASC, Jogo ASC";
         
         const result = await db.execute({ sql: query, args: args }); 
 

@@ -18,152 +18,225 @@
 </head>
 <body class="min-h-screen font-sans">
 
-    <main class="max-w-5xl mx-auto px-4 py-6">
-        <div class="flex gap-8 mb-6 border-b border-gray-700 justify-center md:justify-start">
-            <button onclick="switchTab('cravados')" id="btn-cravados" class="tab-active py-2 px-4 font-bold transition">
-                <i class="fas fa-bullseye mr-2"></i>Cravados
-            </button>
-            <button onclick="switchTab('torcida')" id="btn-torcida" class="py-2 px-4 font-bold text-gray-500 hover:text-yellow-500 transition">
-                <i class="fas fa-flag mr-2"></i>Torcida
-            </button>
-	    <a href="javascript:void(0)" class="ml-auto py-2 px-4 font-bold text-red-500 hover:text-red-400 transition flex items-center" onclick="if (typeof limparCentro === 'function') { limparCentro(); } else { history.back(); }"> 
-		<i class="fas fa-undo-alt mr-2"></i>Voltar </a>
+    <main class="max-w-5xl mx-auto px-4 py-2 mt-0 content-start justify-start text-left items-start">
+        <div class="flex justify-between items-center mb-6 border-b border-slate-700 pb-4">
+            <h1 class="text-xl font-bold tracking-wider text-yellow-500 uppercase flex items-center gap-2">
+                <i class="fas fa-chart-bar"></i> Painel de Estatísticas do Bolão
+            </h1>
+            <a href="index.html" class="text-sm bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded transition-all">
+                <i class="fas fa-arrow-left"></i> Voltar
+            </a>
         </div>
 
-<section id="sec-cravados" class="block">
-    <div class="p-6 rounded-2xl bg-slate-800/50 border border-slate-700">
-        <h2 class="font-bold mb-4 text-yellow-500 text-xl">Ranking de Precisão</h2>
-        <div class="chart-container" style="position: relative; height: 500px; overflow-y: auto;">
-            <div id="chart-wrapper" style="min-height: 400px; width: 100%;"> 
-                <canvas id="chartCravados"></canvas>
+        <div class="flex flex-wrap justify-between items-center gap-4 bg-slate-800/50 p-4 rounded-xl mb-6 border border-slate-700">
+            <div class="flex bg-slate-900 p-1 rounded-lg border border-slate-700">
+                <button onclick="mudarAba('geral')" id="btn-geral" class="px-4 py-2 rounded-md text-sm font-medium transition-all tab-active bg-slate-800 text-yellow-500">
+                    Geral
+                </button>
+                <button onclick="mudarAba('gerencia')" id="btn-gerencia" class="px-4 py-2 rounded-md text-sm font-medium text-slate-400 hover:text-white transition-all">
+                    Gerência
+                </button>
+                <button onclick="mudarAba('times')" id="btn-times" class="px-4 py-2 rounded-md text-sm font-medium text-slate-400 hover:text-white transition-all">
+                    Equipes
+                </button>
             </div>
-        </div>
-    </div>
-</section>
 
-        <section id="sec-torcida" class="hidden">
-            <div class="p-6 rounded-2xl bg-slate-800/50 border border-slate-700">
-                <h2 class="font-bold mb-4 text-yellow-500 text-xl">Pontuação Total por Time</h2>
-                <div class="relative h-[400px]">
-                    <canvas id="chartTorcida"></canvas>
+            <div class="flex items-center gap-3">
+                <div id="wrapper-metrica" class="flex bg-slate-900 p-1 rounded-lg border border-slate-700 hidden">
+                    <button onclick="mudarMetrica('SOMA')" id="btn-soma" class="px-3 py-1 rounded text-xs bg-emerald-600 text-white font-bold">Soma</button>
+                    <button onclick="mudarMetrica('MEDIA')" id="btn-media" class="px-3 py-1 rounded text-xs text-slate-400">Média</button>
+                </div>
+
+                <div id="wrapper-limite" class="flex bg-slate-900 p-1 rounded-lg border border-slate-700">
+                    <button onclick="mudarLimite(15)" id="btn-lim15" class="px-3 py-1 rounded text-xs bg-blue-600 text-white font-bold">Top 15</button>
+                    <button onclick="mudarLimite(50)" id="btn-lim50" class="px-3 py-1 rounded text-xs text-slate-400">Top 50</button>
+                    <button onclick="mudarLimite(0)" id="btn-limAll" class="px-3 py-1 rounded text-xs text-slate-400">Todos</button>
                 </div>
             </div>
-        </section>
+        </div>
+
+		<div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 md:p-5 shadow-2xl w-full top-0 sticky">
+			<h3 id="titulo-grafico" class="text-md font-bold text-slate-300 mb-4 flex items-center gap-2 uppercase tracking-wide">
+			</h3>
+			<div class="relative w-full chart-container overflow-y-auto block clean-block" style="height: 550px; max-height: 600px;">
+				<canvas id="chartPrincipal" class="block w-full m-0 p-0"></canvas>
+			</div>
+		</div>
     </main>
 
     <script>
-if (typeof ChartDataLabels !== 'undefined') {
-    Chart.register(ChartDataLabels);
-} else {
-    console.error("Erro: O plugin ChartDataLabels não foi carregado!");
-}
-        let chartCravadosInstance = null;
-        let chartTorcidaInstance = null;
+        let abaAtual = 'geral';
+        let metricaAtual = 'SOMA';
+        let limiteAtual = 15;
+        let chartInstance = null;
 
-        function switchTab(tab) {
-            document.getElementById('sec-cravados').classList.toggle('hidden', tab !== 'cravados');
-            document.getElementById('sec-torcida').classList.toggle('hidden', tab !== 'torcida');
-            document.getElementById('btn-cravados').className = tab === 'cravados' ? 'tab-active py-2 px-4 font-bold transition' : 'py-2 px-4 font-bold text-gray-500 hover:text-yellow-500 transition';
-            document.getElementById('btn-torcida').className = tab === 'torcida' ? 'tab-active py-2 px-4 font-bold transition' : 'py-2 px-4 font-bold text-gray-500 hover:text-yellow-500 transition';
-        }
-
-async function fetchData() {
-    try {
-        const response = await fetch('/api/estatisticas');
-        const data = await response.json();
-        
-        if (data.cravados && data.cravados.length > 0) {
-            // Ajuste dinâmico de altura: 40px por utilizador
-            const novaAltura = Math.max(400, data.cravados.length * 40);
-            document.getElementById('chart-wrapper').style.height = novaAltura + 'px';
-            renderCravados(data.cravados);
-        }
-        
-        if (data.torcida) {
-            renderTorcida(data.torcida);
-        }
-    } catch (error) {
-        console.error("Erro ao carregar:", error);
-    }
-}
-        function renderCravados(lista) {
-	    const canvas = document.getElementById('chartCravados');
-	    if (!canvas) {
- 	       console.warn("Aguardando o elemento #chartCravados aparecer no DOM...");
-	        return; 
-	    }
-	    const ctx = canvas.getContext('2d');
-	    if (chartCravadosInstance) chartCravadosInstance.destroy();
-
-chartCravadosInstance = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: lista.map(u => u.Apelido),
-                    datasets: [
-                        { 
-                            label: 'Placar Exato (25 pts)', 
-                            data: lista.map(u => u.acertos_25 || 0), 
-                            backgroundColor: '#FFD700' // Ouro
-                        },
-                        { 
-                            label: 'Resultado/Tendência (10 pts)', 
-                            data: lista.map(u => u.acertos_10 || 0), 
-                            backgroundColor: '#10b981' // Esmeralda / Verde
-                        }
-                    ]
-                },
-                options: {
-                    indexAxis: 'y',
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        x: { stacked: true, grid: { color: '#334155' }, ticks: { color: '#FFD700' } },
-                        y: { stacked: true, grid: { display: false }, ticks: { color: '#FFD700', font: { weight: 'bold' } } }
-                    },
-                    plugins: {
-                        legend: { position: 'bottom', labels: { color: '#FFD700' } },
-                        datalabels: {
-                            color: '#000',
-                            anchor: 'center',
-                            align: 'center',
-                            font: { weight: 'bold' },
-                            formatter: (value) => value > 0 ? value : ''
-                        }
-                    }
+        // Gerencia a troca de abas primárias
+        function mudarAba(aba) {
+            abaAtual = aba;
+            
+            // Atualiza classes visuais dos botões das abas
+            ['geral', 'gerencia', 'times'].forEach(a => {
+                const btn = document.getElementById(`btn-${a}`);
+                if (a === aba) {
+                    btn.classList.add('bg-slate-800', 'text-yellow-500');
+                    btn.classList.remove('text-slate-400');
+                } else {
+                    btn.classList.remove('bg-slate-800', 'text-yellow-500');
+                    btn.classList.add('text-slate-400');
                 }
             });
+
+            // Mostra/Esconde sub-filtros dependendo da aba
+            if (aba === 'geral') {
+                document.getElementById('wrapper-metrica').classList.add('hidden');
+                document.getElementById('wrapper-limite').classList.remove('hidden');
+            } else {
+                document.getElementById('wrapper-metrica').classList.remove('hidden');
+                document.getElementById('wrapper-limite').classList.add('hidden');
+            }
+
+            carregarDadosEstatistica();
         }
 
-        function renderTorcida(lista) {
-            const ctx = document.getElementById('chartTorcida').getContext('2d');
-            if (chartTorcidaInstance) chartTorcidaInstance.destroy();
-            chartTorcidaInstance = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: lista.map(t => t.Time),
-                    datasets: [{
-                        label: 'Pontos',
-                        data: lista.map(t => t.pontos),
-                        backgroundColor: '#10b981'
-                    }]
-                },
-                options: {
-                    indexAxis: 'y',
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        x: { ticks: { color: '#FFD700' } },
-                        y: { ticks: { color: '#FFD700' } }
-                    }
+        function mudarMetrica(metrica) {
+            metricaAtual = metrica;
+            document.getElementById('btn-soma').className = metrica === 'SOMA' ? 'px-3 py-1 rounded text-xs bg-emerald-600 text-white font-bold' : 'px-3 py-1 rounded text-xs text-slate-400';
+            document.getElementById('btn-media').className = metrica === 'MEDIA' ? 'px-3 py-1 rounded text-xs bg-emerald-600 text-white font-bold' : 'px-3 py-1 rounded text-xs text-slate-400';
+            carregarDadosEstatistica();
+        }
+
+        function mudarLimite(limite) {
+            limiteAtual = limite;
+            document.getElementById('btn-lim15').className = limite === 15 ? 'px-3 py-1 rounded text-xs bg-blue-600 text-white font-bold' : 'px-3 py-1 rounded text-xs text-slate-400';
+            document.getElementById('btn-lim50').className = limite === 50 ? 'px-3 py-1 rounded text-xs bg-blue-600 text-white font-bold' : 'px-3 py-1 rounded text-xs text-slate-400';
+            document.getElementById('btn-limAll').className = limite === 0 ? 'px-3 py-1 rounded text-xs bg-blue-600 text-white font-bold' : 'px-3 py-1 rounded text-xs text-slate-400';
+            carregarDadosEstatistica();
+        }
+
+        async function carregarDadosEstatistica() {
+            try {
+                let url = `/api/estatisticas/${abaAtual}`;
+                if (abaAtual !== 'geral') {
+                    url += `?tipo=${metricaAtual}`;
                 }
-            });
+
+                const res = await fetch(url);
+                const resJson = await res.json();
+                
+                if (!resJson.success || !resJson.dados) return;
+
+                let dadosProcessados = resJson.dados;
+
+                // Define título e paleta de cores baseado na aba
+                let titulo = "";
+                let labelEixo = "";
+                let corBarra = "";
+
+                if (abaAtual === 'geral') {
+                    titulo = `<i class="fas fa-users text-blue-500"></i> Ranking Geral por Apelido`;
+                    labelEixo = "Apelido";
+                    corBarra = 'rgba(59, 130, 246, 0.85)'; // Azul Royal
+                    
+                    // Aplica fatiamento do limite se for gráfico geral
+                    if (limiteAtual > 0) {
+                        dadosProcessados = dadosProcessados.slice(0, limiteAtual);
+                        titulo += ` (Top ${limiteAtual})`;
+                    }
+                } else if (abaAtual === 'gerencia') {
+                    titulo = `<i class="fas fa-sitemap text-emerald-500"></i> Desempenho por Gerência (${metricaAtual.toLowerCase()})`;
+                    labelEixo = "Gerencia";
+                    corBarra = 'rgba(16, 185, 129, 0.85)'; // Verde Esmeralda
+                } else {
+                    titulo = `<i class="fas fa-people-group text-cyan-500"></i> Desempenho por Equipes de Trabalho (${metricaAtual.toLowerCase()})`;
+                    labelEixo = "Time";
+                    corBarra = 'rgba(6, 182, 212, 0.85)'; // Ciano
+                }
+
+                document.getElementById('titulo-grafico').innerHTML = titulo;
+
+                // Extrai labels dinamicamente baseado na coluna retornada (Apelido, Gerencia ou Time)
+                const labels = dadosProcessados.map(item => item[labelEixo] || "Não Informado");
+                const valores = dadosProcessados.map(item => item.TotalPontos);
+
+                renderizarGraficoHorizontal(labels, valores, corBarra);
+
+            } catch (error) {
+                console.error("Erro ao carregar dados do gráfico:", error);
+            }
         }
 
-	setTimeout(() => {
-            fetchData();
-        }, 100);
+		function renderizarGraficoHorizontal(labels, valores, corBarra) {
+			const ctx = document.getElementById('chartPrincipal').getContext('2d');
+			
+			if (chartInstance) {
+				chartInstance.destroy();
+			}
 
+			// Reduzimos de 35 para 28 para compactar o gráfico verticalmente e mantê-lo no topo
+			const alturaDinamica = Math.max(500, labels.length * 28);
+			const canvasContainer = document.getElementById('chartPrincipal').parentElement;
+			
+			// Atualiza a altura do container interno para gerar o scroll correto
+			canvasContainer.style.height = `${alturaDinamica}px`;
+
+			chartInstance = new Chart(ctx, {
+				type: 'bar',
+				data: {
+					labels: labels,
+					datasets: [{
+						data: valores,
+						backgroundColor: corBarra,
+						borderRadius: 6,
+						borderSkipped: false,
+						barThickness: 18 // Ajustado levemente para casar com a altura menor por linha
+					}]
+				},
+				options: {
+					indexAxis: 'y',
+					responsive: true,
+					maintainAspectRatio: false, // Fundamental para respeitar a altura que setamos via JS
+					layout: {
+						padding: {
+							top: 5,   // Garante que a primeira barra fique colada no topo do canvas
+							bottom: 5,
+							left: 0,
+							right: 20 // Espaço para a label do último colocado não cortar
+						}
+					},
+					plugins: {
+						legend: { display: false },
+						datalabels: {
+							color: '#fff',
+							anchor: 'end',
+							align: 'left',
+							offset: 8,
+							font: { weight: 'bold', size: 11 },
+							formatter: (value) => value
+						}
+					},
+					scales: {
+						x: {
+							grid: { color: 'rgba(255, 255, 255, 0.05)' },
+							ticks: { color: '#94a3b8' }
+						},
+						y: {
+							grid: { display: false },
+							ticks: { 
+								color: '#f8fafc',
+								font: { weight: '600' },
+								mirror: false // Mantém os nomes fixos na lateral esquerda externa
+							}
+						}
+					}
+				},
+				plugins: [ChartDataLabels]
+			});
+		}
+
+        // Inicialização automática ao entrar na página
+        window.addEventListener('DOMContentLoaded', () => {
+            mudarAba('geral');
+        });
     </script>
 </body>
 </html>
