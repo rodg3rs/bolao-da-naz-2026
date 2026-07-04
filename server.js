@@ -606,13 +606,14 @@ app.get('/api/estatisticas/quase-la', async (req, res) => {
     }
 });
 
-// Rota: O Jogo Mais Difícil (Zebra)
+// Rota Corrigida: O Jogo Mais Difícil (Zebra)
 app.get('/api/estatisticas/jogo-zebra', async (req, res) => {
     try {
-        // Agrupando por Jogo para garantir que os resultados Res1 e Res2 venham preenchidos corretamente
+        // O WHERE garante que só entram jogos já encerrados/com resultado preenchido
         const query = `
             SELECT Jogo, Sel1, Sel2, Res1 as Gols1, Res2 as Gols2, AVG(Pontos) as MediaPontos
             FROM dApostas
+            WHERE Res1 IS NOT NULL AND Res2 IS NOT NULL
             GROUP BY Jogo, Sel1, Sel2, Res1, Res2
             ORDER BY MediaPontos ASC
             LIMIT 5
