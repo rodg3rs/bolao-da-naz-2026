@@ -663,6 +663,25 @@ app.get('/api/estatisticas/time-previsivel', async (req, res) => {
     }
 });
 
+// 3.2: Os 5 que mais cravaram (Mais acertos de 25 pontos por apostador)
+app.get('/api/estatisticas/maiores-cravadores', async (req, res) => {
+    try {
+        const query = `
+            SELECT Apelido, COUNT(*) as QtdCravadas
+            FROM dApostas
+            WHERE Pontos = 25
+            GROUP BY Apelido
+            ORDER BY QtdCravadas DESC
+            LIMIT 5
+        `;
+        const result = await db.execute(query);
+        res.json({ success: true, dados: result.rows });
+    } catch (error) {
+        console.error("Erro na API maiores-cravadores:", error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 // --- INICIALIZAÇÃO DO SERVIDOR ---
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
