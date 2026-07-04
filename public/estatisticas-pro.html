@@ -1,6 +1,11 @@
 <!-- Salvar como public/estatisticas-aba.html -->
 <div id="painel-estatisticas-retro" class="estatisticas-container">
-    
+ <!-- Botão Voltar para o Statis-Pro -->
+<div class="flex justify-between items-center mb-4 pb-2 border-b border-[#2d2d2d]">
+    <button onclick="limparCentro(null)" class="flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-medium bg-[#1e293b] text-[#94a3b8] hover:text-[#f1f5f9] border border-[#334155] transition-all">
+        <i class="fas fa-arrow-left"></i> Voltar para o Início
+    </button>
+</div>   
 <style>
     .estatisticas-container {
         font-family: 'Segoe UI', system-ui, sans-serif;
@@ -78,8 +83,7 @@
 </style>
 
     <div class="stats-header">
-        <h2>📊 Resenha Estatística - Edição Histórica</h2>
-        <p>Análises e auditoria consolidadas diretamente da base do Turso DB.</p>
+        <h2>📊 Resenha Estatística</h2>
     </div>
 
     <div class="stats-grid">
@@ -112,7 +116,7 @@
         <!-- Card 3: Jogo dos Deuses -->
         <div class="stats-card">
             <div class="card-header-title">
-                <span class="emoji">⚡</span> O Jogo dos Deuses (Placar Cheio)
+                <span class="emoji">⚡</span> O Jogo dos Deuses (Acerto Exato)
             </div>
             <table class="stats-table" id="table-deuses">
                 <thead>
@@ -125,11 +129,11 @@
         <!-- Card 4: Mais Previsível -->
         <div class="stats-card">
             <div class="card-header-title">
-                <span class="emoji">🔮</span> O Time Mais Previsível
+                <span class="emoji">🔮</span> A Seleção Mais Previsível
             </div>
             <table class="stats-table" id="table-previsivel">
                 <thead>
-                    <tr><th>Equipe</th><th style="text-align: right;">Média Gerada</th></tr>
+                    <tr><th>Seleção</th><th style="text-align: right;">Média Gerada</th></tr>
                 </thead>
                 <tbody><tr><td colspan="2" style="color:#555;">Carregando...</td></tr></tbody>
             </table>

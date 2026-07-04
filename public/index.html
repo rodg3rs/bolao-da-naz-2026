@@ -82,14 +82,17 @@
                 <i class="fas fa-futbol"></i> Meus Palpites
             </button>
             <button onclick="carregarModulo('galera.html', this)" class="menu-item !w-auto">
-    		<i class="fas fa-users"></i> Galera
-	    </button>
-	    <button onclick="carregarModulo('regras.html', this)" class="menu-item !w-auto">
-	        <i class="fas fa-file-alt"></i> Regras
-	    </button>
+				<i class="fas fa-users"></i> Galera
+			</button>
+			<button onclick="carregarModulo('regras.html', this)" class="menu-item !w-auto">
+				<i class="fas fa-file-alt"></i> Regras
+			</button>
             <button onclick="carregarModulo('estatistica.html', this)" class="menu-item !w-auto">
                 <i class="fas fa-chart-bar"></i> Statis
             </button>
+			<button onclick="carregarModulo('estatisticas-pro.html', this)" class="menu-item !w-auto">
+				<i class="fas fa-chart-line"></i> Statis-Pro
+			</button>
             <button onclick="carregarModulo('admin.html', this)" class="menu-item !w-auto">
                 <i class="fas fa-cogs"></i> Admin
             </button>
@@ -153,7 +156,7 @@
                 const centro = document.getElementById('conteudo-central');
 
 			// AJUSTE AQUI: Remove o background e garante o alinhamento correto no topo e largura total
-			if (arquivo === 'estatistica.html') {
+			if (arquivo === 'estatistica.html')|| arquivo === 'estatisticas-pro.html'){
 				centro.style.backgroundImage = 'none';
 				centro.style.backgroundColor = 'var(--card-bg)';
 				centro.style.display = 'block'; // Muda de flex para block para o container fluir naturalmente do topo
