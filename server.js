@@ -584,6 +584,85 @@ app.post('/api/logout', async (req, res) => {
     } catch (e) { res.status(500).json({ success: false }); }
 });
 
+// --- Novas APIs de Estatísticas Retrospectivas (Seções 3 e 4) ---
+
+// 3.1: O Inimigo do Acerto (Quase Lá) - Quem mais errou o placar exato por 1 gol
+app.get('/api/estatisticas/quase-la', async (req, res) => {
+    try {
+        const query = `
+            SELECT Apelido, COUNT(*) as QtdQuase
+            FROM dApostas
+            WHERE Pontos = 10 
+              AND (ABS(Ap1 - Res1) = 1 OR ABS(Ap2 - Res2) = 1)
+            GROUP BY Apelido
+            ORDER BY QtdQuase DESC
+            LIMIT 5
+        `;
+        const result = await db.execute(query);
+        res.json({ success: true, dados: result.rows });
+    } catch (error) {
+        console.error("Erro na API quase-la:", error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// 4.1: O Jogo Mais Difícil (A Grande Zebra)
+app.get('/api/estatisticas/jogo-zebra', async (req, res) => {
+    try {
+        const query = `
+            SELECT Jogo, Sel1, Sel2, ROUND(AVG(IFNULL(Pontos, 0)), 1) as MediaPontos
+            FROM dApostas
+            WHERE Res1 IS NOT NULL AND Res2 IS NOT NULL
+            GROUP BY Jogo, Sel1, Sel2
+            ORDER BY MediaPontos ASC
+            LIMIT 3
+        `;
+        const result = await db.execute(query);
+        res.json({ success: true, dados: result.rows });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// 4.2: O Jogo dos Deuses (Mais acertos de 25 pontos)
+app.get('/api/estatisticas/jogo-dos-deuses', async (req, res) => {
+    try {
+        const query = `
+            SELECT Jogo, Sel1, Sel2, COUNT(*) as QtdMitos
+            FROM dApostas
+            WHERE Pontos = 25
+            GROUP BY Jogo, Sel1, Sel2
+            ORDER BY QtdMitos DESC
+            LIMIT 3
+        `;
+        const result = await db.execute(query);
+        res.json({ success: true, dados: result.rows });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// 4.3: O Time Real Mais Previsível (Quem gerou mais pontos para a galera)
+app.get('/api/estatisticas/time-previsivel', async (req, res) => {
+    try {
+        const query = `
+            SELECT Time, ROUND(AVG(Pontos), 1) as MediaPontosGerados
+            FROM (
+                SELECT Sel1 as Time, Pontos FROM dApostas WHERE Pontos IS NOT NULL
+                UNION ALL
+                SELECT Sel2 as Time, Pontos FROM dApostas WHERE Pontos IS NOT NULL
+            )
+            GROUP BY Time
+            ORDER BY MediaPontosGerados DESC
+            LIMIT 3
+        `;
+        const result = await db.execute(query);
+        res.json({ success: true, dados: result.rows });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 // --- INICIALIZAÇÃO DO SERVIDOR ---
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));

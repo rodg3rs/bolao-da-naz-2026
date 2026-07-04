@@ -1,0 +1,182 @@
+<!-- Salvar como public/estatisticas-aba.html -->
+<div id="painel-estatisticas-retro" class="estatisticas-container">
+    
+    <style>
+        .estatisticas-container {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            color: #ffffff;
+            background-color: #121212;
+            padding: 25px;
+            border-radius: 14px;
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+        .stats-header {
+            border-left: 5px solid #4CAF50;
+            padding-left: 15px;
+            margin-bottom: 30px;
+        }
+        .stats-header h2 {
+            margin: 0;
+            color: #4CAF50;
+            font-size: 24px;
+        }
+        .stats-header p {
+            margin: 5px 0 0 0;
+            color: #aaa;
+            font-size: 14px;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 20px;
+        }
+        .stats-card {
+            background: #1a1a1a;
+            border: 1px solid #2d2d2d;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            transition: transform 0.2s;
+        }
+        .stats-card:hover {
+            transform: translateY(-3px);
+            border-color: #4CAF50;
+        }
+        .card-header-title {
+            display: flex;
+            align-items: center;
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #ffc107;
+        }
+        .card-header-title .emoji {
+            font-size: 22px;
+            margin-right: 10px;
+        }
+        .stats-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        .stats-table th {
+            text-align: left;
+            color: #888;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #333;
+        }
+        .stats-table td {
+            padding: 8px 0;
+            border-bottom: 1px dashed #222;
+        }
+        .highlight-text {
+            color: #4CAF50;
+            font-weight: bold;
+        }
+    </style>
+
+    <div class="stats-header">
+        <h2>📊 Resenha Estatística - Edição Histórica</h2>
+        <p>Análises e auditoria consolidadas diretamente da base do Turso DB.</p>
+    </div>
+
+    <div class="stats-grid">
+        <!-- Card 1: Quase Lá -->
+        <div class="stats-card">
+            <div class="card-header-title">
+                <span class="emoji">🎯</span> O Rei do Quase (Inimigo da Sorte)
+            </div>
+            <table class="stats-table" id="table-quase">
+                <thead>
+                    <tr><th>Apostador</th><th style="text-align: right;">Erros por 1 Gol</th></tr>
+                </thead>
+                <tbody><tr><td colspan="2" style="color:#555;">Carregando...</td></tr></tbody>
+            </table>
+        </div>
+
+        <!-- Card 2: A Grande Zebra -->
+        <div class="stats-card">
+            <div class="card-header-title">
+                <span class="emoji">🦓</span> O Jogo Mais Difícil (Zebra)
+            </div>
+            <table class="stats-table" id="table-zebra">
+                <thead>
+                    <tr><th>Partida</th><th style="text-align: right;">Média de Pontos</th></tr>
+                </thead>
+                <tbody><tr><td colspan="2" style="color:#555;">Carregando...</td></tr></tbody>
+            </table>
+        </div>
+
+        <!-- Card 3: Jogo dos Deuses -->
+        <div class="stats-card">
+            <div class="card-header-title">
+                <span class="emoji">⚡</span> O Jogo dos Deuses (Placar Cheio)
+            </div>
+            <table class="stats-table" id="table-deuses">
+                <thead>
+                    <tr><th>Partida</th><th style="text-align: right;">Cravadas (25 pts)</th></tr>
+                </thead>
+                <tbody><tr><td colspan="2" style="color:#555;">Carregando...</td></tr></tbody>
+            </table>
+        </div>
+
+        <!-- Card 4: Mais Previsível -->
+        <div class="stats-card">
+            <div class="card-header-title">
+                <span class="emoji">🔮</span> O Time Mais Previsível
+            </div>
+            <table class="stats-table" id="table-previsivel">
+                <thead>
+                    <tr><th>Equipe</th><th style="text-align: right;">Média Gerada</th></tr>
+                </thead>
+                <tbody><tr><td colspan="2" style="color:#555;">Carregando...</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // Executa as chamadas de API assim que o elemento for renderizado
+        async function carregarEstatisticasRetro() {
+            try {
+                // 1. Carrega Reis do Quase
+                const resQuase = await fetch('/api/estatisticas/quase-la').then(r => r.json());
+                if(resQuase.success) {
+                    document.querySelector('#table-quase tbody').innerHTML = resQuase.dados.map(row => `
+                        <tr><td>${row.Apelido}</td><td style="text-align: right;" class="highlight-text">${row.QtdQuase} vezes</td></tr>
+                    `).join('');
+                }
+
+                // 2. Carrega Zebras
+                const resZebra = await fetch('/api/estatisticas/jogo-zebra').then(r => r.json());
+                if(resZebra.success) {
+                    document.querySelector('#table-zebra tbody').innerHTML = resZebra.dados.map(row => `
+                        <tr><td>${row.Sel1} x ${row.Sel2}</td><td style="text-align: right; color: #ff6b6b;">${row.MediaPontos} pts</td></tr>
+                    `).join('');
+                }
+
+                // 3. Carrega Jogo dos Deuses
+                const resDeuses = await fetch('/api/estatisticas/jogo-dos-deuses').then(r => r.json());
+                if(resDeuses.success) {
+                    document.querySelector('#table-deuses tbody').innerHTML = resDeuses.dados.map(row => `
+                        <tr><td>${row.Sel1} x ${row.Sel2}</td><td style="text-align: right;" class="highlight-text">${row.QtdMitos} acertos</td></tr>
+                    `).join('');
+                }
+
+                // 4. Carrega Time Previsível
+                const resPrevisivel = await fetch('/api/estatisticas/time-previsivel').then(r => r.json());
+                if(resPrevisivel.success) {
+                    document.querySelector('#table-previsivel tbody').innerHTML = resPrevisivel.dados.map(row => `
+                        <tr><td>${row.Time}</td><td style="text-align: right; color: #ffc107;">${row.MediaPontosGerados} pts</td></tr>
+                    `).join('');
+                }
+
+            } catch (err) {
+                console.error("Erro ao popular tabelas estatísticas:", err);
+            }
+        }
+
+        // Auto-executa a carga inicial
+        carregarEstatisticasRetro();
+    </script>
+</div>
