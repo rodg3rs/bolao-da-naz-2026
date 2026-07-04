@@ -66,11 +66,10 @@
         padding-bottom: 8px;
         border-bottom: 1px solid #333;
     }
-    /* 🔥 Aqui estava o problema! Corrigido para garantir leitura fácil offline e online */
     .stats-table td {
         padding: 8px 0;
         border-bottom: 1px dashed #222;
-        color: #e0e0e0; /* Cinza claro bem visível */
+        color: #e0e0e0;
     }
     .highlight-text {
         color: #4CAF50;
@@ -135,9 +134,8 @@
                 <tbody><tr><td colspan="2" style="color:#555;">Carregando...</td></tr></tbody>
             </table>
         </div>
-    </div>
-	
-<!-- Card Novo: Maiores Cravadores -->
+
+        <!-- Card 5: Maiores Cravadores (Agora devidamente aninhado na Grid!) -->
         <div class="stats-card">
             <div class="card-header-title">
                 <span class="emoji">🏆</span> Top Cravadores (Mitos do Placar)
@@ -149,48 +147,77 @@
                 <tbody><tr><td colspan="2" style="color:#555;">Carregando...</td></tr></tbody>
             </table>
         </div>
-    <script>
-        // Executa as chamadas de API assim que o elemento for renderizado
-        async function carregarEstatisticasRetro() {
-            try {
-                // 1. Carrega Reis do Quase
-                const resQuase = await fetch('/api/estatisticas/quase-la').then(r => r.json());
-                if(resQuase.success) {
-                    document.querySelector('#table-quase tbody').innerHTML = resQuase.dados.map(row => `
-                        <tr><td>${row.Apelido}</td><td style="text-align: right;" class="highlight-text">${row.QtdQuase} vezes</td></tr>
-                    `).join('');
-                }
-
-                // 2. Carrega Zebras
-                const resZebra = await fetch('/api/estatisticas/jogo-zebra').then(r => r.json());
-                if(resZebra.success) {
-                    document.querySelector('#table-zebra tbody').innerHTML = resZebra.dados.map(row => `
-                        <tr><td>${row.Sel1} x ${row.Sel2}</td><td style="text-align: right; color: #ff6b6b;">${row.MediaPontos} pts</td></tr>
-                    `).join('');
-                }
-
-                // 3. Carrega Jogo dos Deuses
-                const resDeuses = await fetch('/api/estatisticas/jogo-dos-deuses').then(r => r.json());
-                if(resDeuses.success) {
-                    document.querySelector('#table-deuses tbody').innerHTML = resDeuses.dados.map(row => `
-                        <tr><td>${row.Sel1} x ${row.Sel2}</td><td style="text-align: right;" class="highlight-text">${row.QtdMitos} acertos</td></tr>
-                    `).join('');
-                }
-
-                // 4. Carrega Time Previsível
-                const resPrevisivel = await fetch('/api/estatisticas/time-previsivel').then(r => r.json());
-                if(resPrevisivel.success) {
-                    document.querySelector('#table-previsivel tbody').innerHTML = resPrevisivel.dados.map(row => `
-                        <tr><td>${row.Time}</td><td style="text-align: right; color: #ffc107;">${row.MediaPontosGerados} pts</td></tr>
-                    `).join('');
-                }
-
-            } catch (err) {
-                console.error("Erro ao popular tabelas estatísticas:", err);
+    </div>
+	
+<script>
+    async function carregarEstatisticasRetro() {
+        try {
+            // 1. Carrega Reis do Quase
+            const resQuase = await fetch('/api/estatisticas/quase-la').then(r => r.json());
+            if(resQuase.success) {
+                document.querySelector('#table-quase tbody').innerHTML = resQuase.dados.map(row => `
+                    <tr><td>${row.Apelido || row.apelido}</td><td style="text-align: right;" class="highlight-text">${row.QtdQuase || row.qtdquase} vezes</td></tr>
+                `).join('');
             }
-        }
 
-        // Auto-executa a carga inicial
-        carregarEstatisticasRetro();
-    </script>
+            // 2. Carrega Zebras (Com os placares corrigidos em Amarelo Ouro)
+            const resZebra = await fetch('/api/estatisticas/jogo-zebra').then(r => r.json());
+            if(resZebra.success) {
+                document.querySelector('#table-zebra tbody').innerHTML = resZebra.dados.map(row => {
+                    // Garante que vai ler 'Gols1' ou 'gols1' (segurança contra o driver do Turso)
+                    const g1 = row.Gols1 ?? row.gols1;
+                    const g2 = row.Gols2 ?? row.gols2;
+                    const s1 = row.Sel1 ?? row.sel1;
+                    const s2 = row.Sel2 ?? row.sel2;
+                    
+                    const placar = (g1 !== undefined && g1 !== null) 
+                        ? ` <span style="color: #FFD700; font-weight: bold;">${g1} x ${g2}</span> ` 
+                        : ' x ';
+                        
+                    return `<tr><td>${s1}${placar}${s2}</td><td style="text-align: right; color: #ff6b6b;">${Number(row.MediaPontos || row.mediapontos).toFixed(1)} pts</td></tr>`;
+                }).join('');
+            }
+
+            // 3. Carrega Jogo dos Deuses (Com os placares corrigidos em Amarelo Ouro)
+            const resDeuses = await fetch('/api/estatisticas/jogo-dos-deuses').then(r => r.json());
+            if(resDeuses.success) {
+                document.querySelector('#table-deuses tbody').innerHTML = resDeuses.dados.map(row => {
+                    const g1 = row.Gols1 ?? row.gols1;
+                    const g2 = row.Gols2 ?? row.gols2;
+                    const s1 = row.Sel1 ?? row.sel1;
+                    const s2 = row.Sel2 ?? row.sel2;
+                    
+                    const placar = (g1 !== undefined && g1 !== null) 
+                        ? ` <span style="color: #FFD700; font-weight: bold;">${g1} x ${g2}</span> ` 
+                        : ' x ';
+                        
+                    return `<tr><td>${s1}${placar}${s2}</td><td style="text-align: right;" class="highlight-text">${row.QtdMitos || row.qtdmitos} acertos</td></tr>`;
+                }).join('');
+            }
+
+            // 4. Carrega Time Previsível
+            const resPrevisivel = await fetch('/api/estatisticas/time-previsivel').then(r => r.json());
+            if(resPrevisivel.success) {
+                document.querySelector('#table-previsivel tbody').innerHTML = resPrevisivel.dados.map(row => `
+                    <tr><td>${row.Time || row.time}</td><td style="text-align: right; color: #ffc107;">${Number(row.MediaPontosGerados || row.mediapontosgerados).toFixed(1)} pts</td></tr>
+                `).join('');
+            }
+
+            // 5. Carrega os Maiores Cravadores
+            const resCravadores = await fetch('/api/estatisticas/maiores-cravadores').then(r => r.json());
+            if(resCravadores.success) {
+                document.querySelector('#table-cravadores tbody').innerHTML = resCravadores.dados.map(row => `
+                    <tr><td>${row.Apelido || row.apelido}</td><td style="text-align: right;" class="highlight-text">${row.QtdCravadas || row.qtdcravadas} cravadas</td></tr>
+                `).join('');
+            }
+
+        } catch (err) {
+            console.error("Erro ao popular tabelas estatísticas:", err);
+        }
+    }
+
+    // Executa ao carregar a aba
+    carregarEstatisticasRetro();
+</script>
+
 </div>

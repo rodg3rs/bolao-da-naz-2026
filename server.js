@@ -606,38 +606,41 @@ app.get('/api/estatisticas/quase-la', async (req, res) => {
     }
 });
 
-// 4.1: O Jogo Mais Difícil (A Grande Zebra)
+// Rota: O Jogo Mais Difícil (Zebra)
 app.get('/api/estatisticas/jogo-zebra', async (req, res) => {
     try {
+        // Agrupando por Jogo para garantir que os resultados Res1 e Res2 venham preenchidos corretamente
         const query = `
-            SELECT Jogo, Sel1, Sel2, ROUND(AVG(IFNULL(Pontos, 0)), 1) as MediaPontos
+            SELECT Jogo, Sel1, Sel2, Res1 as Gols1, Res2 as Gols2, AVG(Pontos) as MediaPontos
             FROM dApostas
-            WHERE Res1 IS NOT NULL AND Res2 IS NOT NULL
-            GROUP BY Jogo, Sel1, Sel2
+            GROUP BY Jogo, Sel1, Sel2, Res1, Res2
             ORDER BY MediaPontos ASC
-            LIMIT 3
+            LIMIT 5
         `;
         const result = await db.execute(query);
         res.json({ success: true, dados: result.rows });
     } catch (error) {
+        console.error("Erro na API jogo-zebra:", error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
 
-// 4.2: O Jogo dos Deuses (Mais acertos de 25 pontos)
+// Rota: O Jogo dos Deuses (Placar Cheio)
 app.get('/api/estatisticas/jogo-dos-deuses', async (req, res) => {
     try {
+        // Agrupando por Jogo para trazer os líderes de cravadas com seus respectivos Res1 e Res2 oficiais
         const query = `
-            SELECT Jogo, Sel1, Sel2, COUNT(*) as QtdMitos
+            SELECT Jogo, Sel1, Sel2, Res1 as Gols1, Res2 as Gols2, COUNT(*) as QtdMitos
             FROM dApostas
             WHERE Pontos = 25
-            GROUP BY Jogo, Sel1, Sel2
+            GROUP BY Jogo, Sel1, Sel2, Res1, Res2
             ORDER BY QtdMitos DESC
-            LIMIT 3
+            LIMIT 5
         `;
         const result = await db.execute(query);
         res.json({ success: true, dados: result.rows });
     } catch (error) {
+        console.error("Erro na API jogo-dos-deuses:", error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
